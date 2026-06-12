@@ -1,0 +1,61 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.floating { font-weight: 700; font-variant-numeric: tabular-nums; text-transform: none; }
+.empty { padding: 18px; text-align: center; color: var(--muted); font-size: 11px; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.table th {
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  text-align: left;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.table tr:last-child td { border-bottom: none; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ticket { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sym { font-weight: 700; }
+.dir { font-weight: 700; font-size: 10px; }
+.buy { color: var(--buy); }
+.sell { color: var(--sell); }
+.sl { color: var(--red); }
+.tp { color: var(--green); }
+.pnl { font-weight: 700; }
+.profit { color: var(--green); }
+.loss { color: var(--red); }
+
+@media (max-width: 768px) {
+  /* drop ticket + SL/TP columns on narrow screens */
+  .table th:nth-child(1), .table td:nth-child(1),
+  .table th:nth-child(6), .table td:nth-child(6),
+  .table th:nth-child(7), .table td:nth-child(7) { display: none; }
+}

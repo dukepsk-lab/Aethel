@@ -105,6 +105,13 @@ async def trades(limit: int = 100):
         ]
 
 
+@app.get("/positions")
+async def positions():
+    """Currently open positions straight from MT5 (live floating P&L)."""
+    pos = await get_mt5_client().get_positions()
+    return [p.model_dump(mode="json") for p in pos]
+
+
 @app.get("/risk/status")
 async def risk_status():
     async with get_sessionmaker()() as session:

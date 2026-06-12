@@ -6,6 +6,7 @@ import { EquityChart } from "./components/EquityChart";
 import { DecisionFeed } from "./components/DecisionFeed";
 import { SignalFeed } from "./components/SignalFeed";
 import { TradeHistory } from "./components/TradeHistory";
+import { OpenPositions } from "./components/OpenPositions";
 import { AgentDebate } from "./components/AgentDebate";
 import { MetricsPanel } from "./components/MetricsPanel";
 import { SymbolCards } from "./components/SymbolCards";
@@ -35,6 +36,9 @@ export default function Dashboard() {
   );
   const { data: signals } = useSWR(
     `${API}/signals?limit=100`, fetcher, { refreshInterval: 8000 }
+  );
+  const { data: positions } = useSWR(
+    `${API}/positions`, fetcher, { refreshInterval: 5000 }
   );
 
   const selectedDecision = decisions?.find((d: any) => d.decision_id === selectedDecisionId);
@@ -89,6 +93,7 @@ export default function Dashboard() {
         {/* LEFT COLUMN */}
         <div className={styles.leftCol}>
           <SymbolCards decisions={decisions} />
+          <OpenPositions positions={positions} />
           <section className={styles.card}>
             <div className={styles.cardHeader}>Equity Curve</div>
             <EquityChart trades={trades} />
