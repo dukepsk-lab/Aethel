@@ -1,11 +1,15 @@
-export const metadata = { title: "NEXMIND — Aethel Command Center" };
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "NEXMIND — Aethel Command Center",
+  description: "Real-time monitoring for the Aethel trading system",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: "ui-monospace, monospace", background: "#0b0e14", color: "#e6e6e6", margin: 0 }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

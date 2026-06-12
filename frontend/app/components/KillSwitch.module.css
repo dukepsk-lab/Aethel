@@ -1,0 +1,29 @@
+.wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.confirm { color: var(--yellow); font-size: 11px; white-space: nowrap; }
+.cancel {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); cursor: pointer; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+}
+.btn {
+  padding: 7px 16px;
+  border: 1px solid var(--red);
+  background: transparent;
+  color: var(--red);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btn:hover:not(:disabled) { background: rgba(248, 81, 73, 0.1); }
+.armed { background: rgba(248, 81, 73, 0.15); animation: pulse 0.8s infinite alternate; }
+.tripped {
+  background: #2d0e0b;
+  border-color: #5a1a16;
+  color: #7d3d3a;
+  cursor: not-allowed;
+}
+@keyframes pulse { from { opacity: 0.8; } to { opacity: 1; } }

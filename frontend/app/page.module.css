@@ -1,0 +1,95 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 20px;
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.logo { font-size: 18px; }
+.brandName { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: 0.08em; }
+.brandSub { font-size: 11px; color: var(--muted); }
+
+.statusRow { display: flex; gap: 20px; flex: 1; justify-content: center; }
+.statusStat { display: flex; flex-direction: column; align-items: center; }
+.statLabel { font-size: 9px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
+.statValue { font-size: 14px; font-weight: 600; color: var(--text); }
+
+/* ── BANNERS ── */
+.shadowBanner {
+  background: #1c2430;
+  border-bottom: 1px solid #2d3748;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  padding: 5px;
+  letter-spacing: 0.05em;
+}
+.killBanner {
+  background: #2d0e0b;
+  border-bottom: 1px solid var(--red);
+  color: var(--red);
+  font-size: 11px;
+  text-align: center;
+  padding: 5px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* ── MAIN GRID ── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  gap: 12px;
+}
+
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── SHARED CARD ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cardHeader {
+  padding: 10px 14px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}

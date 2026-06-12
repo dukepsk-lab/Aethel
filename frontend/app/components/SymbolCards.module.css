@@ -1,0 +1,39 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.top { display: flex; justify-content: space-between; align-items: center; }
+.sym { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
+.dir { font-size: 10px; font-weight: 700; }
+.buy { color: var(--buy); }
+.sell { color: var(--sell); }
+
+.conf { display: flex; align-items: center; gap: 6px; }
+.confBar { flex: 1; height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+.confFill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+.confVal { font-size: 11px; color: var(--muted); width: 28px; text-align: right; }
+.noSig { font-size: 10px; color: var(--muted); }
+
+.levels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+}
+.level { font-size: 10px; color: var(--muted); }
+.rr { font-size: 10px; color: var(--yellow); grid-column: 1 / -1; }
+
+.state {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
