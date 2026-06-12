@@ -1,13 +1,17 @@
-"""Cloud LLM clients (strictly external APIs — no local inference).
+"""Cloud LLM clients via litellm (strictly external APIs — no local inference).
 
-All three providers are wrapped behind one interface that:
-- requests JSON output natively where the API supports it,
-- validates the response against a Pydantic schema,
-- retries exactly once on invalid JSON,
-- raises LLMUnavailable on any other failure.
+litellm gives us one call signature for DeepSeek / Anthropic / Gemini plus
+built-in retries and per-call cost tracking. On top of that we keep Aethel's
+guarantees:
 
-Callers treat LLMUnavailable as fail-closed: NO TRADE. There is no
-default-approve path anywhere.
+- JSON requested natively where the API supports it,
+- response validated against a Pydantic schema,
+- exactly one schema-retry on invalid output,
+- LLMUnavailable raised on anything else.
+
+Callers treat LLMUnavailable as fail-closed: NO TRADE. Deliberately there is
+NO cross-provider fallback for decisions — Athena must be Claude; silently
+substituting a different reviewer model would change the risk profile.
 """
 
 from __future__ import annotations
@@ -15,10 +19,10 @@ from __future__ import annotations
 import json
 from typing import TypeVar
 
-import httpx
 from pydantic import BaseModel, ValidationError
 
 from aethel.config import get_settings
+from aethel.observability.metrics import metrics
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -41,62 +45,45 @@ def _extract_json(text: str) -> dict:
 class LLMClient:
     def __init__(self) -> None:
         self.s = get_settings()
-        self._http = httpx.AsyncClient(timeout=self.s.llm_timeout_seconds)
+        # provider -> (litellm model string, api key, supports json_object)
+        self._providers = {
+            "deepseek": (f"deepseek/{self.s.deepseek_model}", self.s.deepseek_api_key, True),
+            "anthropic": (f"anthropic/{self.s.anthropic_model}", self.s.anthropic_api_key, False),
+            "gemini": (f"gemini/{self.s.gemini_model}", self.s.gemini_api_key, True),
+        }
 
     async def _call_provider(self, provider: str, system: str, user: str) -> str:
-        if provider == "deepseek":
-            r = await self._http.post(
-                "https://api.deepseek.com/chat/completions",
-                headers={"Authorization": f"Bearer {self.s.deepseek_api_key}"},
-                json={
-                    "model": self.s.deepseek_model,
-                    "messages": [{"role": "system", "content": system},
-                                 {"role": "user", "content": user}],
-                    "response_format": {"type": "json_object"},
-                    "temperature": 0.2,
-                },
-            )
-            r.raise_for_status()
-            return r.json()["choices"][0]["message"]["content"]
+        import litellm
 
-        if provider == "anthropic":
-            r = await self._http.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": self.s.anthropic_api_key,
-                         "anthropic-version": "2023-06-01"},
-                json={
-                    "model": self.s.anthropic_model,
-                    "max_tokens": 2048,
-                    "system": system + "\nRespond with ONLY a raw JSON object — no prose, no code fences.",
-                    "messages": [{"role": "user", "content": user}],
-                    "temperature": 0.2,
-                },
-            )
-            r.raise_for_status()
-            return r.json()["content"][0]["text"]
-
-        if provider == "gemini":
-            r = await self._http.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{self.s.gemini_model}:generateContent",
-                headers={"x-goog-api-key": self.s.gemini_api_key},
-                json={
-                    "system_instruction": {"parts": [{"text": system}]},
-                    "contents": [{"parts": [{"text": user}]}],
-                    "generationConfig": {"responseMimeType": "application/json",
-                                         "temperature": 0.2},
-                },
-            )
-            r.raise_for_status()
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-
-        raise ValueError(f"unknown provider {provider}")
+        model, api_key, json_mode = self._providers[provider]
+        kwargs: dict = {}
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        else:
+            system += "\nRespond with ONLY a raw JSON object — no prose, no code fences."
+        resp = await litellm.acompletion(
+            model=model,
+            api_key=api_key,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}],
+            temperature=0.2,
+            max_tokens=2048,
+            timeout=self.s.llm_timeout_seconds,
+            num_retries=1,  # transport-level retries; schema retry handled below
+            **kwargs,
+        )
+        try:
+            cost = litellm.completion_cost(completion_response=resp)
+            metrics.counters[f"llm_cost_usd_x1e6_{provider}"] += int(cost * 1_000_000)
+        except Exception:
+            pass  # cost tracking is best-effort, never blocks
+        return resp.choices[0].message.content or ""
 
     async def structured(self, provider: str, system: str, user: str, schema: type[T]) -> T:
         """Call the provider and parse into `schema`. One retry on bad JSON,
         then LLMUnavailable."""
         last_err: Exception | None = None
-        for attempt in range(2):
+        for _attempt in range(2):
             try:
                 raw = await self._call_provider(provider, system, user)
                 return schema.model_validate(_extract_json(raw))
@@ -104,6 +91,6 @@ class LLMClient:
                 last_err = e
                 user = (user + "\n\nYour previous response was invalid: "
                         f"{e}\nRespond with ONLY valid JSON matching the schema.")
-            except (httpx.HTTPError, KeyError) as e:
+            except Exception as e:  # litellm raises provider-specific exceptions
                 raise LLMUnavailable(f"{provider}: {e}") from e
         raise LLMUnavailable(f"{provider}: invalid output after retry: {last_err}")

@@ -46,7 +46,7 @@ def build_dataset(m5: pd.DataFrame):
     direction = np.sign(h1_dist).fillna(0).astype(int)
     labels = triple_barrier_labels(base, direction, tp_mult=2.0, sl_mult=1.0, max_holding=48)
 
-    samples, ys, t_ends = [], [], []
+    samples, ys, t_ends, times, dirs = [], [], [], [], []
     for ts, row in labels.iterrows():
         windows = {}
         ok = True
@@ -61,11 +61,14 @@ def build_dataset(m5: pd.DataFrame):
         samples.append(windows)
         ys.append(row["label"])
         t_ends.append(int(row["t_end"]))
+        times.append(ts)
+        dirs.append(int(direction.loc[ts]))
 
     y = torch.tensor(ys, dtype=torch.float32)
     x = {tf: torch.tensor(np.stack([s[tf] for s in samples]), dtype=torch.float32)
          for tf in SEQ}
-    return x, y, np.array(t_ends)
+    meta = pd.DataFrame({"direction": dirs}, index=pd.DatetimeIndex(times))
+    return x, y, np.array(t_ends), meta
 
 
 def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
@@ -75,7 +78,7 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
     from aethel.venus.model import VenusNet
 
     m5 = pd.read_parquet(data_path)
-    x, y, t_end = build_dataset(m5)
+    x, y, t_end, _meta = build_dataset(m5)
     n = len(y)
     print(f"{symbol}: {n} samples, positive rate {y.mean():.3f}")
 

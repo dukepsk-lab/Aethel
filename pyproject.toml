@@ -16,10 +16,12 @@ dependencies = [
     "pandas>=2.2",
     "scikit-learn>=1.5",
     "structlog>=24.1",
+    "litellm>=1.40",
 ]
 
 [project.optional-dependencies]
 ml = ["torch>=2.3"]
+backtest = ["vectorbt>=0.26"]
 mt5 = ["MetaTrader5>=5.0.45"]  # Windows only — install on the gateway host
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5"]
 

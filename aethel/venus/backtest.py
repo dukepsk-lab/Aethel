@@ -1,13 +1,13 @@
-"""Vectorized walk-forward backtest for Venus.
+"""Walk-forward backtest for Venus, simulated through vectorbt.
 
 Usage:
     python -m aethel.venus.backtest --symbol EURUSD --data data/EURUSD_m5.parquet
 
 For each purged walk-forward fold: train on the past, predict the test fold
-out-of-sample, calibrate on prior OOF predictions, then simulate taking every
-signal whose calibrated confidence clears the threshold. Outcomes come from
-the triple-barrier labels (win = +tp_mult R, loss = -sl_mult R) minus a
-spread cost, expressed in R-multiples.
+out-of-sample, calibrate on PRIOR folds' OOF predictions only (no leakage),
+then hand the resulting long/short entries to vectorbt with volatility-scaled
+SL/TP stops, fees and slippage. vectorbt gives us the full stats suite:
+Sharpe, max drawdown, profit factor, trade-level win rate, equity curve.
 
 This evaluates VENUS ONLY. The agent layer cannot be backtested historically
 (API cost + the LLMs' training data contains your test period) — validate it
@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from aethel.venus.features import FEATURE_COLUMNS
+from aethel.venus.labeling import ewm_volatility
 from aethel.venus.train import SEQ, build_dataset
 from aethel.venus.validation import PurgedWalkForward
 
@@ -33,25 +34,34 @@ def run_backtest(
     threshold: float = 0.65,
     tp_mult: float = 2.0,
     sl_mult: float = 1.0,
-    spread_cost_r: float = 0.10,
+    fees: float = 0.00002,        # ~0.2 pip commission-equivalent per side
+    slippage: float = 0.00005,    # ~0.5 pip
     epochs: int = 10,
     n_splits: int = 5,
 ) -> dict:
     import torch
+    import vectorbt as vbt
 
     from aethel.venus.calibration import Calibrator
     from aethel.venus.model import VenusNet
 
-    x, y, t_end = build_dataset(m5)
+    x, y, t_end, meta = build_dataset(m5)
     n = len(y)
 
-    fold_results = []
-    all_trades_r: list[float] = []
+    m15 = m5.resample("15min").agg(
+        {"open": "first", "high": "max", "low": "min",
+         "close": "last", "tick_volume": "sum"}).dropna()
+    close = m15["close"]
+    vol = ewm_volatility(close, span=100)
+
+    # OOS signal arrays assembled across folds
+    conf = pd.Series(np.nan, index=meta.index)
     prior_raw: list[np.ndarray] = []
     prior_y: list[np.ndarray] = []
+    fold_aucs = []
 
     splitter = PurgedWalkForward(n_splits=n_splits, embargo_bars=100)
-    for fold, (tr, te) in enumerate(splitter.split(n, t_end)):
+    for tr, te in splitter.split(n, t_end):
         if len(tr) < 200:
             continue
         model = VenusNet(n_features=len(FEATURE_COLUMNS))
@@ -65,51 +75,64 @@ def run_backtest(
                 loss = loss_fn(model({tf: x[tf][idx] for tf in SEQ}), y[idx])
                 loss.backward()
                 opt.step()
-
         model.eval()
         with torch.no_grad():
             raw = torch.sigmoid(model({tf: x[tf][te] for tf in SEQ})).numpy()
         y_te = y[te].numpy()
+        try:
+            from sklearn.metrics import roc_auc_score
 
-        # calibrate on OOF predictions from PREVIOUS folds only (no leakage)
-        if prior_raw:
+            fold_aucs.append(round(float(roc_auc_score(y_te, raw)), 4))
+        except ValueError:
+            fold_aucs.append(None)
+
+        if prior_raw:  # calibrate on previous folds only — leak-free
             cal = Calibrator()
             cal.fit(np.concatenate(prior_raw), np.concatenate(prior_y))
-            conf = cal.transform(raw)
-        else:
-            conf = raw  # first fold: uncalibrated, reported but typical to discard
+            conf.iloc[te] = cal.transform(raw)
         prior_raw.append(raw)
         prior_y.append(y_te)
 
-        taken = conf >= threshold
-        trades_r = np.where(y_te[taken] == 1, tp_mult, -sl_mult) - spread_cost_r
-        all_trades_r.extend(trades_r.tolist())
-        fold_results.append({
-            "fold": fold,
-            "test_samples": int(len(te)),
-            "signals_taken": int(taken.sum()),
-            "win_rate": round(float(y_te[taken].mean()), 3) if taken.any() else None,
-            "avg_r": round(float(trades_r.mean()), 3) if taken.any() else None,
-            "base_rate": round(float(y_te.mean()), 3),
-        })
+    # --- assemble vectorbt signals on the M15 grid ---
+    conf_full = conf.reindex(close.index)
+    direction = meta["direction"].reindex(close.index)
+    take = conf_full >= threshold
+    entries = (take & (direction > 0)).fillna(False)
+    short_entries = (take & (direction < 0)).fillna(False)
 
-    trades = np.array(all_trades_r)
-    equity = trades.cumsum() if len(trades) else np.array([0.0])
-    peak = np.maximum.accumulate(equity)
-    summary = {
+    sl_frac = (sl_mult * vol / close).clip(lower=1e-5)
+    tp_frac = (tp_mult * vol / close).clip(lower=1e-5)
+
+    pf = vbt.Portfolio.from_signals(
+        close=close,
+        entries=entries,
+        short_entries=short_entries,
+        sl_stop=sl_frac.to_numpy(),
+        tp_stop=tp_frac.to_numpy(),
+        fees=fees,
+        slippage=slippage,
+        init_cash=10_000,
+        size=1.0,
+        size_type="percent",  # full notional per trade; risk scaling is live-side
+        freq="15min",
+    )
+
+    trades = pf.trades
+    stats = {
         "threshold": threshold,
-        "total_trades": int(len(trades)),
-        "win_rate": round(float((trades > 0).mean()), 3) if len(trades) else None,
-        "total_r": round(float(trades.sum()), 2),
-        "avg_r_per_trade": round(float(trades.mean()), 3) if len(trades) else None,
-        "max_drawdown_r": round(float((equity - peak).min()), 2),
-        "profit_factor": (
-            round(float(trades[trades > 0].sum() / -trades[trades < 0].sum()), 2)
-            if (trades < 0).any() and (trades > 0).any() else None
+        "oos_samples": int(conf.notna().sum()),
+        "fold_aucs": fold_aucs,
+        "total_trades": int(trades.count()),
+        "win_rate": round(float(trades.win_rate()), 3) if trades.count() else None,
+        "profit_factor": round(float(trades.profit_factor()), 2) if trades.count() else None,
+        "total_return_pct": round(float(pf.total_return()) * 100, 2),
+        "sharpe": round(float(pf.sharpe_ratio()), 2),
+        "max_drawdown_pct": round(float(pf.max_drawdown()) * 100, 2),
+        "avg_trade_return_pct": (
+            round(float(trades.returns.mean()) * 100, 3) if trades.count() else None
         ),
-        "folds": fold_results,
     }
-    return summary
+    return stats
 
 
 if __name__ == "__main__":

@@ -39,7 +39,8 @@ from aethel.venus.inference import VenusInference
 
 log = structlog.get_logger("orchestrator")
 
-CANDLE_COUNTS = {Timeframe.M5: 200, Timeframe.M15: 200, Timeframe.H1: 200}
+# enough history for feature warm-up (fracdiff/ATR percentile ~500 bars) + model window
+CANDLE_COUNTS = {Timeframe.M5: 700, Timeframe.M15: 700, Timeframe.H1: 600}
 
 
 class Orchestrator:
