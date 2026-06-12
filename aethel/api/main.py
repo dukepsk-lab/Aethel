@@ -24,6 +24,7 @@ from aethel.db.session import get_sessionmaker, init_db
 from aethel.mt5 import get_mt5_client
 from aethel.observability.alerts import send_alert
 from aethel.observability.metrics import metrics
+from aethel.observability.signal_log import signal_log
 from aethel.orchestrator import Orchestrator
 
 log = structlog.get_logger("api")
@@ -62,6 +63,13 @@ async def health():
 @app.get("/metrics")
 async def get_metrics():
     return metrics.snapshot()
+
+
+@app.get("/signals")
+async def signals(limit: int = 100):
+    """Every Venus signal evaluation — including gate-blocked ones with the
+    block reason. In-memory ring buffer; cleared on restart."""
+    return signal_log.snapshot(limit)
 
 
 @app.get("/decisions")

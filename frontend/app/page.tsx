@@ -4,17 +4,22 @@ import { useState } from "react";
 import useSWR from "swr";
 import { EquityChart } from "./components/EquityChart";
 import { DecisionFeed } from "./components/DecisionFeed";
+import { SignalFeed } from "./components/SignalFeed";
+import { TradeHistory } from "./components/TradeHistory";
 import { AgentDebate } from "./components/AgentDebate";
 import { MetricsPanel } from "./components/MetricsPanel";
 import { SymbolCards } from "./components/SymbolCards";
 import { KillSwitch } from "./components/KillSwitch";
 import styles from "./page.module.css";
 
+type FeedTab = "decisions" | "signals" | "trades";
+
 export const API = process.env.NEXT_PUBLIC_AETHEL_API ?? "http://localhost:8000";
 export const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function Dashboard() {
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
+  const [feedTab, setFeedTab] = useState<FeedTab>("decisions");
 
   const { data: risk, mutate: mutateRisk } = useSWR(
     `${API}/risk/status`, fetcher, { refreshInterval: 5000 }
@@ -27,6 +32,9 @@ export default function Dashboard() {
   );
   const { data: trades } = useSWR(
     `${API}/trades?limit=100`, fetcher, { refreshInterval: 15000 }
+  );
+  const { data: signals } = useSWR(
+    `${API}/signals?limit=100`, fetcher, { refreshInterval: 8000 }
   );
 
   const selectedDecision = decisions?.find((d: any) => d.decision_id === selectedDecisionId);
@@ -90,12 +98,31 @@ export default function Dashboard() {
 
         {/* RIGHT COLUMN */}
         <div className={styles.rightCol}>
-          <DecisionFeed
-            decisions={decisions}
-            selectedId={selectedDecisionId}
-            onSelect={setSelectedDecisionId}
-          />
-          {selectedDecision && (
+          <div className={styles.tabs}>
+            {([
+              ["decisions", `Decisions${decisions?.length ? ` (${decisions.length})` : ""}`],
+              ["signals", `Signals${signals?.length ? ` (${signals.length})` : ""}`],
+              ["trades", `Trades${trades?.length ? ` (${trades.length})` : ""}`],
+            ] as [FeedTab, string][]).map(([tab, label]) => (
+              <button
+                key={tab}
+                className={feedTab === tab ? styles.tabActive : styles.tab}
+                onClick={() => setFeedTab(tab)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {feedTab === "decisions" && (
+            <DecisionFeed
+              decisions={decisions}
+              selectedId={selectedDecisionId}
+              onSelect={setSelectedDecisionId}
+            />
+          )}
+          {feedTab === "signals" && <SignalFeed signals={signals} />}
+          {feedTab === "trades" && <TradeHistory trades={trades} />}
+          {feedTab === "decisions" && selectedDecision && (
             <AgentDebate decision={selectedDecision} onClose={() => setSelectedDecisionId(null)} />
           )}
         </div>

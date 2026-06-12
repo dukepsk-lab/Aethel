@@ -77,6 +77,34 @@
   overflow: hidden;
 }
 
+/* ── FEED TABS ── */
+.tabs {
+  display: flex;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab, .tabActive {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 9px 8px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); background: var(--surface3); }
+.tabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--surface);
+}
+
 /* ── SHARED CARD ── */
 .card {
   background: var(--surface);

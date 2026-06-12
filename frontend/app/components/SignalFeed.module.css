@@ -1,0 +1,51 @@
+.feed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  flex-shrink: 0;
+}
+.count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.list { flex: 1; overflow-y: auto; }
+.empty { padding: 24px; text-align: center; color: var(--muted); font-size: 12px; }
+
+.row {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.rowTop { display: flex; align-items: center; gap: 8px; }
+.time { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.sym { font-weight: 700; font-size: 12px; }
+.dir { font-size: 12px; font-weight: 700; }
+.buy { color: var(--buy); }
+.sell { color: var(--sell); }
+.conf { color: var(--text); font-size: 11px; font-weight: 600; }
+
+.badge {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.pass  { background: rgba(63,185,80,.15);  color: var(--green); }
+.block { background: var(--surface3);       color: var(--muted); }
+
+.reason { font-size: 10px; color: var(--muted); margin-top: 3px; padding-left: 2px; }
+
+@media (max-width: 768px) {
+  .feed { height: auto; max-height: 60vh; }
+}

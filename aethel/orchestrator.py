@@ -38,6 +38,7 @@ from aethel.news.calendar import JsonFeedCalendar, NewsService
 from aethel.observability.alerts import send_alert
 from aethel.observability.audit import gather_weekly_stats
 from aethel.observability.metrics import metrics
+from aethel.observability.signal_log import signal_log
 from aethel.risk_gate.gate import RiskGate
 from aethel.signal_gate import SignalGate
 from aethel.venus.inference import VenusInference
@@ -99,6 +100,7 @@ class Orchestrator:
 
         # 2. Signal Gate
         consult, reason = self.signal_gate.should_consult_agents(signal)
+        signal_log.record(signal, passed=consult, reason=reason)
         if not consult:
             log.debug("gate_blocked", symbol=symbol, reason=reason)
             metrics.incr("gate_blocked")

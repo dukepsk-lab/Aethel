@@ -4,3 +4,5 @@ export { EquityChart } from "./EquityChart";
 export { MetricsPanel } from "./MetricsPanel";
 export { DecisionFeed } from "./DecisionFeed";
 export { AgentDebate } from "./AgentDebate";
+export { SignalFeed } from "./SignalFeed";
+export { TradeHistory } from "./TradeHistory";
