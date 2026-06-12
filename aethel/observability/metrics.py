@@ -1,4 +1,4 @@
-"""Lightweight in-process metrics, exposed via the API for NEXMIND.
+"""Lightweight in-process metrics, exposed via the API for Aethel Command Center.
 
 Tracks the numbers that tell you whether the system is healthy and whether
 the agents are earning their latency: per-stage timings, veto rate,

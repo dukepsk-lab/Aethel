@@ -47,7 +47,7 @@ MT5 data ─> Venus ─> Signal Gate ─> Ares ─> Athena ─> RISK GATE ─> H
 
 The `MetaTrader5` Python package is **Windows-only**. Default deployment:
 
-- **Linux brain** — FastAPI (NEXMIND backend), Venus inference, agents,
+- **Linux brain** — FastAPI (Aethel Command Center backend), Venus inference, agents,
   PostgreSQL+pgvector. Talks to the gateway over HTTP (`AETHEL_MT5_MODE=gateway`).
 - **Windows gateway** — `aethel/mt5/gateway_server.py` next to the MT5 terminal,
   bearer-token protected, private network only.
@@ -73,7 +73,7 @@ python -m aethel.venus.train --symbol EURUSD --data data/EURUSD_m5.parquet
 Training uses triple-barrier labeling, purged walk-forward validation with
 embargo, and isotonic calibration — see `aethel/venus/`.
 
-## API (NEXMIND backend)
+## API (Aethel Command Center backend)
 
 | Endpoint | Purpose |
 |---|---|
@@ -100,8 +100,8 @@ aethel/
   db/                PostgreSQL models, persisted risk state, pgvector memory
   observability/     metrics + Telegram alerts
   orchestrator.py    the pipeline loop
-  api/               NEXMIND FastAPI backend
-frontend/            NEXMIND Command Center (Next.js)
+  api/               Aethel Command Center FastAPI backend
+frontend/            Aethel Command Center (Next.js)
 ```
 
 ## Disclaimer

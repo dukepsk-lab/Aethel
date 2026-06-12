@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NEXMIND — Aethel Command Center",
+  title: "Aethel Command Center",
   description: "Real-time monitoring for the Aethel trading system",
 };
 

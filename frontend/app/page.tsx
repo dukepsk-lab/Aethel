@@ -37,8 +37,8 @@ export default function Dashboard() {
       <header className={styles.topbar}>
         <div className={styles.brand}>
           <span className={styles.logo}>⚡</span>
-          <span className={styles.brandName}>NEXMIND</span>
-          <span className={styles.brandSub}>Aethel Command Center</span>
+          <span className={styles.brandName}>Aethel</span>
+          <span className={styles.brandSub}>Command Center</span>
         </div>
 
         <div className={styles.statusRow}>

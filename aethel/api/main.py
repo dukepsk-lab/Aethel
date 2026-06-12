@@ -1,4 +1,4 @@
-"""NEXMIND backend — FastAPI app serving the Command Center.
+"""Aethel Command Center backend — FastAPI app serving the Command Center.
 
 Read-mostly by design: the frontend observes the system. Exactly one write
 path exists — the manual kill switch — because a human must always be able
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
         _loop_task.cancel()
 
 
-app = FastAPI(title="Aethel NEXMIND", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Aethel Command Center", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -112,6 +112,6 @@ async def manual_kill_switch():
         store = RiskStateStore(session)
         account = await get_mt5_client().get_account()
         await store.get_or_create(account.equity)
-        await store.trip_kill_switch("manual trip from NEXMIND")
-    await send_alert("🛑 Kill switch tripped MANUALLY from NEXMIND")
+        await store.trip_kill_switch("manual trip from Aethel Command Center")
+    await send_alert("🛑 Kill switch tripped MANUALLY from Aethel Command Center")
     return {"kill_switch_tripped": True}
