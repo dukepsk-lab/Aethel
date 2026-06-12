@@ -25,6 +25,18 @@ from aethel.venus.validation import PurgedWalkForward
 SEQ = {"M5": 120, "M15": 96, "H1": 72}
 
 
+def pick_device():
+    """Prefer CUDA, then Apple MPS, else CPU. Printed once so the operator
+    can confirm the GPU is actually being used."""
+    import torch
+
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def build_dataset(m5: pd.DataFrame):
     import torch
 
@@ -77,15 +89,23 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
 
     from aethel.venus.model import VenusNet
 
+    device = pick_device()
+    print(f"training on device: {device}")
+
     m5 = pd.read_parquet(data_path)
     x, y, t_end, _meta = build_dataset(m5)
+    # keep features on CPU (can be large); move per-batch. labels are small.
+    y = y.to(device)
     n = len(y)
     print(f"{symbol}: {n} samples, positive rate {y.mean():.3f}")
+
+    def to_device(idx):
+        return {tf: x[tf][idx].to(device) for tf in SEQ}
 
     oof_raw, oof_y = [], []
     splitter = PurgedWalkForward(n_splits=5, embargo_bars=100)
     for fold, (tr, te) in enumerate(splitter.split(n, t_end)):
-        model = VenusNet(n_features=len(FEATURE_COLUMNS))
+        model = VenusNet(n_features=len(FEATURE_COLUMNS)).to(device)
         opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
         loss_fn = torch.nn.BCEWithLogitsLoss()
         for epoch in range(epochs):
@@ -93,16 +113,15 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
             perm = np.random.permutation(tr)
             for i in range(0, len(perm), batch_size):
                 idx = perm[i:i + batch_size]
-                batch = {tf: x[tf][idx] for tf in SEQ}
                 opt.zero_grad()
-                loss = loss_fn(model(batch), y[idx])
+                loss = loss_fn(model(to_device(idx)), y[idx])
                 loss.backward()
                 opt.step()
         model.eval()
         with torch.no_grad():
-            logits = model({tf: x[tf][te] for tf in SEQ})
-        oof_raw.append(torch.sigmoid(logits).numpy())
-        oof_y.append(y[te].numpy())
+            logits = model(to_device(te))
+        oof_raw.append(torch.sigmoid(logits).cpu().numpy())
+        oof_y.append(y[te].cpu().numpy())
         print(f"fold {fold}: test acc "
               f"{((torch.sigmoid(logits) > 0.5).float() == y[te]).float().mean():.3f}")
 
@@ -110,7 +129,7 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
     calibrator.fit(np.concatenate(oof_raw), np.concatenate(oof_y))
 
     # Final champion: retrain on all data, ship with the OOF-fit calibrator.
-    model = VenusNet(n_features=len(FEATURE_COLUMNS))
+    model = VenusNet(n_features=len(FEATURE_COLUMNS)).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     loss_fn = torch.nn.BCEWithLogitsLoss()
     for _ in range(epochs):
@@ -118,13 +137,14 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
         for i in range(0, n, batch_size):
             idx = perm[i:i + batch_size]
             opt.zero_grad()
-            loss = loss_fn(model({tf: x[tf][idx] for tf in SEQ}), y[idx])
+            loss = loss_fn(model(to_device(idx)), y[idx])
             loss.backward()
             opt.step()
 
     sym_dir = out_dir / symbol
     sym_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), sym_dir / "model.pt")
+    # save on CPU so the artifact loads anywhere regardless of training device
+    torch.save({k: v.cpu() for k, v in model.state_dict().items()}, sym_dir / "model.pt")
     calibrator.save(sym_dir / "calibrator.pkl")
     version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
     (sym_dir / "version.txt").write_text(version)
