@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+*.pt
+*.onnx
+models/artifacts/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+.next/
+frontend/.env*
+logs/
