@@ -18,7 +18,7 @@ from aethel.core.schemas import Action, Candle, Timeframe, VenusSignal
 from aethel.venus.calibration import Calibrator
 from aethel.venus.features import FEATURE_COLUMNS, compute_features
 
-SEQ_LEN = {Timeframe.M1: 120, Timeframe.M15: 96, Timeframe.H1: 72}
+SEQ_LEN = {Timeframe.M5: 120, Timeframe.M15: 96, Timeframe.H1: 72}
 
 
 class VenusInference:

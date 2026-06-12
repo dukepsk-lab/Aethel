@@ -21,7 +21,7 @@ from aethel.core.schemas import (
 from aethel.config import SYMBOL_SPECS
 from aethel.mt5.base import MT5Client
 
-_TF_MAP = {"M1": 1, "M15": 15, "H1": 16385}  # MetaTrader5 timeframe constants
+_TF_MAP = {"M5": 5, "M15": 15, "H1": 16385}  # MetaTrader5 timeframe constants
 
 
 class DirectMT5Client(MT5Client):

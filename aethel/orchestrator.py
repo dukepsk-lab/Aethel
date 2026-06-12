@@ -39,7 +39,7 @@ from aethel.venus.inference import VenusInference
 
 log = structlog.get_logger("orchestrator")
 
-CANDLE_COUNTS = {Timeframe.M1: 200, Timeframe.M15: 200, Timeframe.H1: 200}
+CANDLE_COUNTS = {Timeframe.M5: 200, Timeframe.M15: 200, Timeframe.H1: 200}
 
 
 class Orchestrator:
@@ -76,7 +76,7 @@ class Orchestrator:
                 await self.trade_manager.manage_all()
             except Exception as e:
                 log.error("management_error", error=str(e))
-            await asyncio.sleep(60)  # one pass per M1 close
+            await asyncio.sleep(300)  # one pass per M5 close
 
     async def process_symbol(self, symbol: str) -> None:
         # 1. Venus signal

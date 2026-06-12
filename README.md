@@ -18,7 +18,7 @@ running 24/5.
 
 ```
 MT5 data ─> Venus ─> Signal Gate ─> Ares ─> Athena ─> RISK GATE ─> Hermes ─> MT5
- (M1/M15/H1)  │     (threshold,    (propose) (veto      (hardcoded   (limit order,
+ (M5/M15/H1)  │     (threshold,    (propose) (veto      (hardcoded   (limit order,
               │      cooldown,                power)     Python —     broker-side
               │      call budget)                        AI cannot    SL/TP, TTL,
               │                                          override)    idempotent)
@@ -67,7 +67,7 @@ uvicorn aethel.api.main:app   # starts API + trading loop (shadow mode)
 Train Venus per symbol (offline, before going live):
 
 ```bash
-python -m aethel.venus.train --symbol EURUSD --data data/EURUSD_m1.parquet
+python -m aethel.venus.train --symbol EURUSD --data data/EURUSD_m5.parquet
 ```
 
 Training uses triple-barrier labeling, purged walk-forward validation with

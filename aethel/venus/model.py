@@ -2,7 +2,7 @@
 
 Architecture (per symbol — one trained model per instrument):
 
-    M1 sequence  -> Conv1d front-end -> TCN -> attention pool ┐
+    M5 sequence  -> Conv1d front-end -> TCN -> attention pool ┐
     M15 sequence -> Conv1d front-end -> TCN -> attention pool ├-> fusion MLP -> logit
     H1 sequence  -> Conv1d front-end -> TCN -> attention pool ┘
 
@@ -90,7 +90,7 @@ class VenusNet(nn.Module):
     """Per-symbol model. Input: dict of (batch, time, features) tensors keyed
     by timeframe. Output: uncalibrated logit for P(TP before SL)."""
 
-    TIMEFRAMES = ("M1", "M15", "H1")
+    TIMEFRAMES = ("M5", "M15", "H1")
 
     def __init__(self, n_features: int, hidden: int = 64, dropout: float = 0.2):
         super().__init__()

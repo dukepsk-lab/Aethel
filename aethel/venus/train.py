@@ -4,7 +4,7 @@ isotonic calibration on out-of-fold predictions, champion artifact export.
 Usage:
     python -m aethel.venus.train --symbol EURUSD --data data/EURUSD.parquet
 
-The data file must contain M1 OHLCV with a UTC DatetimeIndex; M15/H1 are
+The data file must contain M5 OHLCV with a UTC DatetimeIndex; M15/H1 are
 resampled from it.
 """
 
@@ -22,18 +22,18 @@ from aethel.venus.features import FEATURE_COLUMNS, compute_features
 from aethel.venus.labeling import triple_barrier_labels
 from aethel.venus.validation import PurgedWalkForward
 
-SEQ = {"M1": 120, "M15": 96, "H1": 72}
+SEQ = {"M5": 120, "M15": 96, "H1": 72}
 
 
-def build_dataset(m1: pd.DataFrame):
+def build_dataset(m5: pd.DataFrame):
     import torch
 
     frames = {
-        "M1": m1,
-        "M15": m1.resample("15min").agg(
+        "M5": m5,
+        "M15": m5.resample("15min").agg(
             {"open": "first", "high": "max", "low": "min",
              "close": "last", "tick_volume": "sum"}).dropna(),
-        "H1": m1.resample("1h").agg(
+        "H1": m5.resample("1h").agg(
             {"open": "first", "high": "max", "low": "min",
              "close": "last", "tick_volume": "sum"}).dropna(),
     }
@@ -74,8 +74,8 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
 
     from aethel.venus.model import VenusNet
 
-    m1 = pd.read_parquet(data_path)
-    x, y, t_end = build_dataset(m1)
+    m5 = pd.read_parquet(data_path)
+    x, y, t_end = build_dataset(m5)
     n = len(y)
     print(f"{symbol}: {n} samples, positive rate {y.mean():.3f}")
 

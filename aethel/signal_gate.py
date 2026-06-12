@@ -1,6 +1,6 @@
 """Signal Gate — sits between Venus and the agent team.
 
-Without it, M1-cadence signals × 4 symbols would mean thousands of LLM calls
+Without it, M5-cadence signals × 4 symbols would mean hundreds of LLM calls
 per day chasing noise. Agents are consulted only when:
 - Venus confidence >= threshold,
 - the per-symbol cooldown has elapsed,
