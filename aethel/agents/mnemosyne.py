@@ -45,5 +45,5 @@ class Mnemosyne:
 
     async def analyze(self, trade_context: dict) -> TradeLesson:
         return await self.llm.structured(
-            "gemini", SYSTEM, json.dumps(trade_context, default=str), TradeLesson
+            "mnemosyne", SYSTEM, json.dumps(trade_context, default=str), TradeLesson
         )

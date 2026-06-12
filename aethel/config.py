@@ -48,10 +48,11 @@ class Settings(BaseSettings):
     # LLM APIs (strictly cloud)
     deepseek_api_key: str = ""
     deepseek_model: str = "deepseek-chat"
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-6"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    # Athena (Chief Risk Officer) — Gemini 3.1 Pro Preview, updated 2026-06-12
+    athena_model: str = "gemini-3.1-pro-preview"
+    # Mnemosyne (post-trade analyst) — Gemini 3.5 Flash
+    mnemosyne_model: str = "gemini-3.5-flash"
     llm_timeout_seconds: float = 30.0
 
     # Execution

@@ -9,10 +9,10 @@ running 24/5.
 | Agent | God of | Engine | Role |
 |---|---|---|---|
 | **Venus** | — | CNN + TCN (PyTorch) | Calibrated P(TP before SL) signal, per symbol |
-| **Ares** 🗡 | War | DeepSeek (cloud API) | Proposes trade setups (action, entry, SL, TP, risk %) |
-| **Athena** 🦉 | Wisdom | Claude Sonnet 4.6 (cloud API) | Chief Risk Officer with absolute veto |
+| **Ares** 🗡 | War | DeepSeek `deepseek-chat` (cloud API) | Proposes trade setups (action, entry, SL, TP, risk %) |
+| **Athena** 🦉 | Wisdom | Gemini `gemini-3.1-pro-preview` (cloud API) | Chief Risk Officer with absolute veto |
 | **Hermes** ⚡ | Messengers | Pure Python | Limit-order execution — zero LLM latency |
-| **Mnemosyne** 📖 | Memory | Gemini (cloud API) | Post-trade lessons into pgvector for RAG |
+| **Mnemosyne** 📖 | Memory | Gemini `gemini-3.5-flash` (cloud API) | Post-trade lessons into pgvector for RAG |
 
 ## Pipeline
 

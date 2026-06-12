@@ -1,4 +1,4 @@
-"""Athena — Chief Risk Officer (Claude). Reviews Ares's proposal against
+"""Athena — Chief Risk Officer (Gemini 3.1 Pro Preview). Reviews Ares's proposal against
 upcoming news, current drawdown and open exposure. Absolute veto power:
 a VETO terminates the trade path with no re-negotiation.
 
@@ -73,7 +73,7 @@ class Athena:
             "daily_pnl_pct": daily_pnl_pct,
             "upcoming_high_impact_events": upcoming_events,
         })
-        raw = await self.llm.structured("anthropic", SYSTEM, user, _AthenaRaw)
+        raw = await self.llm.structured("athena", SYSTEM, user, _AthenaRaw)
         return AthenaDecision(
             verdict=raw.verdict,
             veto_reason=raw.veto_reason,

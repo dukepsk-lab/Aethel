@@ -1,6 +1,6 @@
 """Cloud LLM clients via litellm (strictly external APIs — no local inference).
 
-litellm gives us one call signature for DeepSeek / Anthropic / Gemini plus
+litellm gives us one call signature for DeepSeek / Gemini plus
 built-in retries and per-call cost tracking. On top of that we keep Aethel's
 guarantees:
 
@@ -10,7 +10,7 @@ guarantees:
 - LLMUnavailable raised on anything else.
 
 Callers treat LLMUnavailable as fail-closed: NO TRADE. Deliberately there is
-NO cross-provider fallback for decisions — Athena must be Claude; silently
+NO cross-provider fallback for decisions — Athena must be Gemini 3.1 Pro; silently
 substituting a different reviewer model would change the risk profile.
 """
 
@@ -48,8 +48,8 @@ class LLMClient:
         # provider -> (litellm model string, api key, supports json_object)
         self._providers = {
             "deepseek": (f"deepseek/{self.s.deepseek_model}", self.s.deepseek_api_key, True),
-            "anthropic": (f"anthropic/{self.s.anthropic_model}", self.s.anthropic_api_key, False),
-            "gemini": (f"gemini/{self.s.gemini_model}", self.s.gemini_api_key, True),
+            "athena": (f"gemini/{self.s.athena_model}", self.s.gemini_api_key, True),
+            "mnemosyne": (f"gemini/{self.s.mnemosyne_model}", self.s.gemini_api_key, True),
         }
 
     async def _call_provider(self, provider: str, system: str, user: str) -> str:
