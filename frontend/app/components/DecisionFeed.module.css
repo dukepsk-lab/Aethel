@@ -54,3 +54,8 @@
 
 .veto   { font-size: 11px; color: var(--red); margin-top: 4px; padding-left: 2px; }
 .levels { font-size: 10px; color: var(--muted); margin-top: 4px; padding-left: 2px; }
+
+@media (max-width: 768px) {
+  /* bounded so the feed scrolls in place instead of collapsing to 0 height */
+  .feed { height: auto; max-height: 60vh; }
+}

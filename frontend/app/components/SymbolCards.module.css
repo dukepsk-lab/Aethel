@@ -3,6 +3,9 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
+@media (max-width: 768px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

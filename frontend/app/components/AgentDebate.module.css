@@ -68,3 +68,8 @@
   white-space: pre-wrap;
 }
 .na { font-size: 11px; color: var(--muted); font-style: italic; }
+
+@media (max-width: 768px) {
+  /* cap height so the internal scroll keeps working when stacked */
+  .panel { flex: none; max-height: 75vh; }
+}
