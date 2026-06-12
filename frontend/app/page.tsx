@@ -7,13 +7,15 @@ import { DecisionFeed } from "./components/DecisionFeed";
 import { SignalFeed } from "./components/SignalFeed";
 import { TradeHistory } from "./components/TradeHistory";
 import { OpenPositions } from "./components/OpenPositions";
+import { ShadowTrades } from "./components/ShadowTrades";
+import { NewsPanel } from "./components/NewsPanel";
 import { AgentDebate } from "./components/AgentDebate";
 import { MetricsPanel } from "./components/MetricsPanel";
 import { SymbolCards } from "./components/SymbolCards";
 import { KillSwitch } from "./components/KillSwitch";
 import styles from "./page.module.css";
 
-type FeedTab = "decisions" | "signals" | "trades";
+type FeedTab = "decisions" | "signals" | "shadow" | "trades";
 
 export const API = process.env.NEXT_PUBLIC_AETHEL_API ?? "http://localhost:8000";
 export const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -39,6 +41,12 @@ export default function Dashboard() {
   );
   const { data: positions } = useSWR(
     `${API}/positions`, fetcher, { refreshInterval: 5000 }
+  );
+  const { data: shadowTrades } = useSWR(
+    `${API}/shadow-trades?limit=50`, fetcher, { refreshInterval: 10000 }
+  );
+  const { data: news } = useSWR(
+    `${API}/news`, fetcher, { refreshInterval: 60000 }
   );
 
   const selectedDecision = decisions?.find((d: any) => d.decision_id === selectedDecisionId);
@@ -96,8 +104,9 @@ export default function Dashboard() {
           <OpenPositions positions={positions} />
           <section className={styles.card}>
             <div className={styles.cardHeader}>Equity Curve</div>
-            <EquityChart trades={trades} />
+            <EquityChart trades={trades} currentEquity={risk?.equity} />
           </section>
+          <NewsPanel news={news} />
           <MetricsPanel metrics={metrics} />
         </div>
 
@@ -107,6 +116,7 @@ export default function Dashboard() {
             {([
               ["decisions", `Decisions${decisions?.length ? ` (${decisions.length})` : ""}`],
               ["signals", `Signals${signals?.length ? ` (${signals.length})` : ""}`],
+              ["shadow", `Shadow${shadowTrades?.length ? ` (${shadowTrades.length})` : ""}`],
               ["trades", `Trades${trades?.length ? ` (${trades.length})` : ""}`],
             ] as [FeedTab, string][]).map(([tab, label]) => (
               <button
@@ -126,6 +136,7 @@ export default function Dashboard() {
             />
           )}
           {feedTab === "signals" && <SignalFeed signals={signals} />}
+          {feedTab === "shadow" && <ShadowTrades trades={shadowTrades} />}
           {feedTab === "trades" && <TradeHistory trades={trades} />}
           {feedTab === "decisions" && selectedDecision && (
             <AgentDebate decision={selectedDecision} onClose={() => setSelectedDecisionId(null)} />

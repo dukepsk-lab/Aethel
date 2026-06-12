@@ -3,7 +3,13 @@
 import { useEffect, useRef } from "react";
 import styles from "./EquityChart.module.css";
 
-export function EquityChart({ trades }: { trades: any[] | undefined }) {
+export function EquityChart({
+  trades,
+  currentEquity,
+}: {
+  trades: any[] | undefined;
+  currentEquity?: number;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
@@ -41,7 +47,10 @@ export function EquityChart({ trades }: { trades: any[] | undefined }) {
 
   useEffect(() => {
     if (!seriesRef.current || !trades?.length) return;
-    let equity = 10_000;
+    // anchor the curve to the REAL account equity: walk forward from
+    // (current equity - total closed P&L) so the last point = equity now
+    const totalPnl = trades.reduce((s: number, t: any) => s + t.profit, 0);
+    let equity = (currentEquity ?? 10_000 + totalPnl) - totalPnl;
     const points = trades
       .slice()
       .sort((a: any, b: any) => new Date(a.closed_at).getTime() - new Date(b.closed_at).getTime())
@@ -53,7 +62,7 @@ export function EquityChart({ trades }: { trades: any[] | undefined }) {
         };
       });
     if (points.length) seriesRef.current.setData(points);
-  }, [trades]);
+  }, [trades, currentEquity]);
 
   return (
     <div className={styles.wrap}>

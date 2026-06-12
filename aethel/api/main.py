@@ -17,11 +17,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
-from aethel.config import SYMBOLS, get_settings
+from aethel.config import SYMBOL_SPECS, SYMBOLS, get_settings
 from aethel.db.models import ClosedTrade, Decision
 from aethel.db.risk_state import RiskStateStore
 from aethel.db.session import get_sessionmaker, init_db
 from aethel.mt5 import get_mt5_client
+from aethel.news.calendar import JsonFeedCalendar, NewsService
 from aethel.observability.alerts import send_alert
 from aethel.observability.metrics import metrics
 from aethel.observability.signal_log import signal_log
@@ -103,6 +104,70 @@ async def trades(limit: int = 100):
             }
             for t in rows
         ]
+
+
+_news = NewsService(JsonFeedCalendar())
+
+
+@app.get("/shadow-trades")
+async def shadow_trades(limit: int = 50):
+    """Orders that passed every gate in shadow mode but were never sent.
+    Hypothetical floating P&L is marked-to-market against the current tick —
+    this is what the system WOULD be holding if shadow mode were off."""
+    mt5 = get_mt5_client()
+    ticks: dict[str, float] = {}
+    async with get_sessionmaker()() as session:
+        stmt = (select(Decision)
+                .where(Decision.state.in_(["EXECUTED", "MANAGED"]))
+                .order_by(Decision.created_at.desc()).limit(limit))
+        rows = (await session.execute(stmt)).scalars().all()
+    out = []
+    for d in rows:
+        if not (d.execution or {}).get("shadow") or not d.risk_outcome:
+            continue
+        o = d.risk_outcome
+        sym, spec = o["symbol"], SYMBOL_SPECS[o["symbol"]]
+        if sym not in ticks:
+            try:
+                t = await mt5.get_tick(sym)
+                ticks[sym] = (t.bid + t.ask) / 2
+            except Exception:
+                ticks[sym] = 0.0
+        mid = ticks[sym]
+        sign = 1 if o["action"] == "BUY" else -1
+        pnl = ((mid - o["entry"]) / spec.pip_size * spec.pip_value_per_lot
+               * o["lots"] * sign) if mid else None
+        out.append({
+            "decision_id": d.decision_id, "symbol": sym, "action": o["action"],
+            "lots": o["lots"], "entry": o["entry"], "stop_loss": o["stop_loss"],
+            "take_profit": o["take_profit"], "current_price": mid or None,
+            "hypothetical_pnl": round(pnl, 2) if pnl is not None else None,
+            "created_at": d.created_at.isoformat(),
+        })
+    return out
+
+
+@app.get("/news")
+async def news():
+    """Upcoming calendar events (12h horizon) for traded symbols, plus the
+    per-symbol blackout flag the Risk Gate is currently enforcing."""
+    s = get_settings()
+    events, seen = [], set()
+    blackout = {}
+    for sym in SYMBOLS:
+        try:
+            blocking = await _news.in_blackout(sym, s.news_blackout_minutes)
+            blackout[sym] = blocking.title if blocking else None
+            for e in await _news.upcoming_for_symbol(sym, hours=12):
+                key = (e.time, e.currency, e.title)
+                if key not in seen:
+                    seen.add(key)
+                    events.append(e.model_dump(mode="json"))
+        except Exception:
+            blackout[sym] = None  # feed down — risk gate handles its own fetch
+    events.sort(key=lambda e: e["time"])
+    return {"events": events, "blackout": blackout,
+            "blackout_minutes": s.news_blackout_minutes}
 
 
 @app.get("/positions")

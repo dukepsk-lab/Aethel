@@ -7,3 +7,5 @@ export { AgentDebate } from "./AgentDebate";
 export { SignalFeed } from "./SignalFeed";
 export { TradeHistory } from "./TradeHistory";
 export { OpenPositions } from "./OpenPositions";
+export { ShadowTrades } from "./ShadowTrades";
+export { NewsPanel } from "./NewsPanel";

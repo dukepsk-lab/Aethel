@@ -14,6 +14,10 @@ export function MetricsPanel({ metrics }: { metrics: any }) {
       const prov = k.replace("llm_cost_usd_x1e6_", "");
       return { prov, usd: ((v as number) / 1_000_000).toFixed(4) };
     });
+  if (costEntries.length > 0) {
+    const total = costEntries.reduce((s, e) => s + parseFloat(e.usd), 0);
+    costEntries.push({ prov: "TOTAL", usd: total.toFixed(4) });
+  }
 
   return (
     <div className={styles.wrap}>
