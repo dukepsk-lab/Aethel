@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     athena_model: str = "gemini-3.1-pro-preview"
     # Mnemosyne (post-trade analyst) — Gemini 3.5 Flash
     mnemosyne_model: str = "gemini-3.5-flash"
+    # Apollo (news sentiment, fail-soft advisory context) — Gemini 3.5 Flash
+    apollo_model: str = "gemini-3.5-flash"
+    # Themis (weekly auditor, one call/week) — Gemini 3.1 Pro Preview
+    themis_model: str = "gemini-3.1-pro-preview"
     llm_timeout_seconds: float = 30.0
 
     # Execution

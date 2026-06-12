@@ -12,16 +12,20 @@ There is no retry-into-execution and no default approval.
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from pathlib import Path
 
 import structlog
 
+from aethel.agents.apollo import Apollo
 from aethel.agents.ares import Ares
 from aethel.agents.athena import Athena
 from aethel.agents.llm import LLMClient, LLMUnavailable
 from aethel.agents.mnemosyne import Mnemosyne
+from aethel.agents.themis import Themis
 from aethel.config import SYMBOLS, get_settings
 from aethel.core.lifecycle import TradeState
+from aethel.core.regime import classify_regime
 from aethel.core.schemas import RiskRejection, Timeframe, Verdict, utcnow
 from aethel.db.memory import MemoryStore
 from aethel.db.models import Decision
@@ -32,6 +36,7 @@ from aethel.hermes.management import TradeManager
 from aethel.mt5 import MT5Client
 from aethel.news.calendar import JsonFeedCalendar, NewsService
 from aethel.observability.alerts import send_alert
+from aethel.observability.audit import gather_weekly_stats
 from aethel.observability.metrics import metrics
 from aethel.risk_gate.gate import RiskGate
 from aethel.signal_gate import SignalGate
@@ -53,6 +58,8 @@ class Orchestrator:
         self.mnemosyne = Mnemosyne(llm)
         self.signal_gate = SignalGate()
         self.news = NewsService(JsonFeedCalendar())
+        self.apollo = Apollo(llm, self.news)
+        self.themis = Themis(llm)
         self.risk_gate = RiskGate(self.news)
         self.hermes = Hermes(mt5)
         self.trade_manager = TradeManager(mt5)
@@ -65,6 +72,7 @@ class Orchestrator:
 
     async def run_forever(self) -> None:
         log.info("aethel_started", shadow_mode=self.s.shadow_mode, symbols=SYMBOLS)
+        asyncio.create_task(self._weekly_audit_loop())
         while True:
             for symbol in self.venus:
                 try:
@@ -97,6 +105,13 @@ class Orchestrator:
             return
         self.signal_gate.record_consultation(symbol)
 
+        # advisory context — failure here must never block the pipeline
+        try:
+            regime = classify_regime(candles[Timeframe.H1]).model_dump()
+        except Exception as e:
+            log.warning("regime_failed", symbol=symbol, error=str(e))
+            regime = None
+
         sessionmaker = get_sessionmaker()
         async with sessionmaker() as session:
             risk_store = RiskStateStore(session)
@@ -121,19 +136,22 @@ class Orchestrator:
                     notes = await memory.recall(
                         symbol, " ".join(f"{k}={v}" for k, v in signal.features.items()))
                     proposal = await self.ares.propose(
-                        signal, candles[Timeframe.M15], tick, notes)
+                        signal, candles[Timeframe.M15], tick, notes, regime)
             except (LLMUnavailable, ValueError) as e:
                 log.warning("ares_failed_no_trade", symbol=symbol, error=str(e))
                 metrics.incr("ares_failures")
                 return  # fail closed
 
-            # 4. Athena reviews
+            # 4. Apollo sentiment (fail-soft, hourly-cached), then Athena reviews
+            with metrics.time_stage("apollo"):
+                brief = await self.apollo.brief(list(self.venus))
             try:
                 with metrics.time_stage("athena"):
                     events = await self.news.upcoming_for_symbol(symbol)
                     decision = await self.athena.review(
                         signal, proposal, account, positions, daily_pnl,
-                        [e.model_dump(mode="json") for e in events])
+                        [e.model_dump(mode="json") for e in events],
+                        regime, brief.model_dump() if brief else None)
             except LLMUnavailable as e:
                 log.warning("athena_failed_no_trade", symbol=symbol, error=str(e))
                 metrics.incr("athena_failures")
@@ -190,6 +208,30 @@ class Orchestrator:
             await session.commit()
             log.info("pipeline_complete", symbol=symbol, decision_id=decision.decision_id,
                      executed=result.success, shadow=result.shadow)
+
+    async def _weekly_audit_loop(self) -> None:
+        """Themis runs once a week at the Sunday rollover. Fail-soft: an
+        audit failure is logged and skipped — never touches trading."""
+        while True:
+            now = utcnow()
+            # next Sunday at daily_reset_hour_utc
+            days_ahead = (6 - now.weekday()) % 7
+            target = (now + timedelta(days=days_ahead)).replace(
+                hour=self.s.daily_reset_hour_utc, minute=0, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=7)
+            await asyncio.sleep((target - now).total_seconds())
+            try:
+                account = await self.mt5.get_account()
+                async with get_sessionmaker()() as session:
+                    stats = await gather_weekly_stats(session, account.equity)
+                audit = await self.themis.audit(stats)
+                await send_alert(self.themis.format_report(audit))
+                metrics.incr("themis_audits")
+                log.info("themis_audit_complete", grade=audit.grade)
+            except Exception as e:
+                log.error("themis_audit_failed", error=str(e))
+                metrics.incr("themis_failures")
 
     async def post_trade_analysis(self, decision_id: str, trade_context: dict) -> None:
         """Runs async after a trade closes — never blocks the signal loop."""

@@ -50,6 +50,8 @@ class LLMClient:
             "deepseek": (f"deepseek/{self.s.deepseek_model}", self.s.deepseek_api_key, True),
             "athena": (f"gemini/{self.s.athena_model}", self.s.gemini_api_key, True),
             "mnemosyne": (f"gemini/{self.s.mnemosyne_model}", self.s.gemini_api_key, True),
+            "apollo": (f"gemini/{self.s.apollo_model}", self.s.gemini_api_key, True),
+            "themis": (f"gemini/{self.s.themis_model}", self.s.gemini_api_key, True),
         }
 
     async def _call_provider(self, provider: str, system: str, user: str) -> str:

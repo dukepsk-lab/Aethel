@@ -30,6 +30,11 @@ class CalendarEvent(BaseModel):
     currency: str
     title: str
     impact: str  # "high" | "medium" | "low"
+    # Release figures when the feed provides them (Apollo reasons about
+    # actual-vs-forecast surprises; empty for not-yet-released events).
+    actual: str = ""
+    forecast: str = ""
+    previous: str = ""
 
 
 class CalendarSource(ABC):
@@ -60,6 +65,9 @@ class JsonFeedCalendar(CalendarSource):
                     currency=item["country"],
                     title=item["title"],
                     impact=str(item.get("impact", "low")).lower(),
+                    actual=str(item.get("actual") or ""),
+                    forecast=str(item.get("forecast") or ""),
+                    previous=str(item.get("previous") or ""),
                 ))
             except (KeyError, ValueError):
                 continue
@@ -78,6 +86,17 @@ class NewsService:
         return [
             e for e in await self.source.get_events()
             if e.currency in currencies and now <= e.time <= horizon
+        ]
+
+    async def recent_for_symbol(self, symbol: str, hours_back: int = 6) -> list[CalendarEvent]:
+        """Already-released events in the lookback window — Apollo's raw
+        material for actual-vs-forecast sentiment."""
+        now = utcnow()
+        start = now - timedelta(hours=hours_back)
+        currencies = CURRENCIES_BY_SYMBOL.get(symbol, set())
+        return [
+            e for e in await self.source.get_events()
+            if e.currency in currencies and start <= e.time <= now
         ]
 
     async def in_blackout(self, symbol: str, blackout_minutes: int) -> CalendarEvent | None:

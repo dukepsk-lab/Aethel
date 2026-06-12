@@ -13,6 +13,12 @@ running 24/5.
 | **Athena** 🦉 | Wisdom | Gemini `gemini-3.1-pro-preview` (cloud API) | Chief Risk Officer with absolute veto |
 | **Hermes** ⚡ | Messengers | Pure Python | Limit-order execution — zero LLM latency |
 | **Mnemosyne** 📖 | Memory | Gemini `gemini-3.5-flash` (cloud API) | Post-trade lessons into pgvector for RAG |
+| **Apollo** 🕊 | Prophecy | Gemini `gemini-3.5-flash` (cloud API) | Hourly news-sentiment brief for Athena (fail-soft, advisory only) |
+| **Themis** ⚖ | Justice | Gemini `gemini-3.1-pro-preview` (cloud API) | Weekly performance audit → Telegram; suggestions never auto-applied |
+
+Plus a **rule-based regime classifier** (`core/regime.py`, pure Python — no
+LLM): labels the H1 market as trending/ranging/high-volatility and injects
+that context into the Ares and Athena prompts.
 
 ## Pipeline
 

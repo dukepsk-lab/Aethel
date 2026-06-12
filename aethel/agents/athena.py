@@ -36,6 +36,10 @@ Review the proposal against:
 3. Proposal quality — veto if the stop placement, R:R or rationale is weak,
    or if it contradicts the Venus signal it claims to be based on.
 
+You may also receive an H1 market-regime label and a news-sentiment brief
+(from Apollo). Both are advisory context; either may be null/unavailable —
+their absence is NOT a reason to veto.
+
 You may APPROVE the proposal as-is or VETO it. You may NOT modify its levels.
 Approve only when you would defend this trade in a post-mortem.
 
@@ -63,6 +67,8 @@ class Athena:
         positions: list[Position],
         daily_pnl_pct: float,
         upcoming_events: list[dict],
+        regime: dict | None = None,
+        news_sentiment: dict | None = None,
     ) -> AthenaDecision:
         user = json.dumps({
             "venus_signal": signal.model_dump(mode="json"),
@@ -72,6 +78,8 @@ class Athena:
             "open_positions": [p.model_dump(mode="json") for p in positions],
             "daily_pnl_pct": daily_pnl_pct,
             "upcoming_high_impact_events": upcoming_events,
+            "h1_market_regime": regime,
+            "news_sentiment": news_sentiment,  # Apollo's brief; null = unavailable
         })
         raw = await self.llm.structured("athena", SYSTEM, user, _AthenaRaw)
         return AthenaDecision(

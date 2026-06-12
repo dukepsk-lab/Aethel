@@ -36,6 +36,7 @@ class Ares:
         m15_candles: list[Candle],
         tick: Tick,
         memory_notes: list[str],
+        regime: dict | None = None,
     ) -> AresProposal:
         recent = [
             {"t": c.time.isoformat(), "o": c.open, "h": c.high, "l": c.low, "c": c.close}
@@ -47,6 +48,7 @@ class Ares:
             "current_ask": tick.ask,
             "recent_m15": recent,
             "lessons_from_similar_past_trades": memory_notes,
+            "h1_market_regime": regime,
         })
         proposal = await self.llm.structured("deepseek", SYSTEM, user, AresProposal)
         if proposal.symbol != signal.symbol:
