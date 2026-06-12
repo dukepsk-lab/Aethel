@@ -14,6 +14,7 @@ from pathlib import Path
 
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
 from aethel.config import SYMBOLS, get_settings
@@ -43,6 +44,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Aethel Command Center", version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
