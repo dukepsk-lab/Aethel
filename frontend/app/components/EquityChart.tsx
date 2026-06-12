@@ -11,7 +11,7 @@ export function EquityChart({ trades }: { trades: any[] | undefined }) {
   useEffect(() => {
     if (!ref.current) return;
     let chart: any;
-    import("lightweight-charts").then(({ createChart, LineStyle }) => {
+    import("lightweight-charts").then(({ createChart, LineSeries }) => {
       chart = createChart(ref.current!, {
         layout: { background: { color: "transparent" }, textColor: "#7d8590" },
         grid: { vertLines: { color: "#21262d" }, horzLines: { color: "#21262d" } },
@@ -21,7 +21,7 @@ export function EquityChart({ trades }: { trades: any[] | undefined }) {
         handleScroll: true,
         handleScale: true,
       });
-      const series = chart.addLineSeries({
+      const series = chart.addSeries(LineSeries, {
         color: "#58a6ff",
         lineWidth: 2,
         crosshairMarkerVisible: true,
