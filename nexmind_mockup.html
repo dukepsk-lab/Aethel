@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NEXMIND — Aethel Command Center</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b10;--surface:#0d1117;--surface2:#161b22;--surface3:#1c2430;
+  --border:#21262d;--text:#e6edf3;--muted:#7d8590;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;
+  --yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;
+}
+html,body{height:100%;font-family:"SF Mono","Fira Code",ui-monospace,monospace;
+  background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;
+  -webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── TOPBAR ── */
+.topbar{
+  display:flex;align-items:center;gap:20px;padding:0 20px;height:54px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;flex-shrink:0;
+}
+.brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.logo{font-size:18px}
+.brand-name{font-size:15px;font-weight:700;color:var(--accent);letter-spacing:.08em}
+.brand-sub{font-size:10px;color:var(--muted)}
+.status-row{display:flex;gap:24px;flex:1;justify-content:center}
+.stat{display:flex;flex-direction:column;align-items:center;gap:1px}
+.stat-label{font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.stat-value{font-size:14px;font-weight:600}
+.green{color:var(--green)} .red{color:var(--red)}
+.accent{color:var(--accent)} .yellow{color:var(--yellow)}
+.muted-c{color:var(--muted)}
+.kill-btn{
+  padding:7px 16px;border:1px solid var(--red);background:transparent;
+  color:var(--red);border-radius:6px;font-size:11px;font-weight:700;
+  letter-spacing:.05em;cursor:pointer;white-space:nowrap;font-family:inherit;
+  flex-shrink:0;transition:background .15s
+}
+.kill-btn:hover{background:rgba(248,81,73,.1)}
+
+/* ── BANNER ── */
+.banner{
+  background:#1c2430;border-bottom:1px solid #2d3748;
+  color:var(--muted);font-size:11px;text-align:center;padding:5px;
+  letter-spacing:.05em;
+}
+
+/* ── GRID ── */
+.grid{display:grid;grid-template-columns:1fr 410px;height:calc(100vh - 82px);overflow:hidden}
+.left{display:flex;flex-direction:column;gap:12px;overflow-y:auto;
+  border-right:1px solid var(--border);padding:14px}
+.right{display:flex;flex-direction:column;overflow:hidden}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.card-hdr{
+  padding:9px 13px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface2)
+}
+
+/* ── SYMBOL CARDS ── */
+.sym-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sym-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:11px;display:flex;flex-direction:column;gap:7px
+}
+.sym-top{display:flex;justify-content:space-between;align-items:center}
+.sym-name{font-size:12px;font-weight:700;letter-spacing:.04em}
+.dir-badge{font-size:10px;font-weight:700}
+.conf-row{display:flex;align-items:center;gap:6px}
+.conf-bar{flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.conf-fill{height:100%;border-radius:2px;transition:width .4s}
+.conf-val{font-size:11px;color:var(--muted);width:28px;text-align:right}
+.levels-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 6px}
+.lv{font-size:10px;color:var(--muted)}
+.rr{font-size:10px;color:var(--yellow);grid-column:1/-1}
+.state-tag{font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+
+/* ── EQUITY CHART (fake SVG) ── */
+.chart-wrap{background:var(--surface);height:180px;position:relative;overflow:hidden}
+.chart-wrap svg{width:100%;height:100%}
+.chart-grid-line{stroke:var(--border);stroke-width:.5}
+.chart-line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chart-fill{fill:url(#grad);opacity:.25}
+.chart-label{font-size:9px;fill:var(--muted);font-family:ui-monospace,monospace}
+
+/* ── METRICS ── */
+.metrics-panels{display:flex;flex-direction:column;gap:8px}
+.met-grid{display:grid;grid-template-columns:repeat(3,1fr)}
+.met-cell{
+  padding:8px 11px;border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px
+}
+.met-cell:nth-child(3n){border-right:none}
+.met-label{font-size:10px;color:var(--muted)}
+.met-val{font-size:14px;font-weight:600}
+.lat-grid{padding:10px 13px;display:flex;flex-direction:column;gap:8px}
+.lat-row{display:grid;grid-template-columns:68px 1fr 48px 70px;align-items:center;gap:8px}
+.lat-name{font-size:11px;color:var(--muted)}
+.lat-bar{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.lat-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));border-radius:2px}
+.lat-ms{font-size:11px;font-weight:600;text-align:right}
+.lat-max{font-size:10px;color:var(--muted)}
+.cost-row{display:flex;justify-content:space-between;padding:8px 13px;
+  border-bottom:1px solid var(--border);font-size:11px}
+.cost-row:last-child{border-bottom:none}
+.cost-provider{color:var(--muted)}
+.cost-val{font-weight:600;color:var(--yellow)}
+
+/* ── DECISION FEED ── */
+.feed{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0}
+.feed-hdr{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 14px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface2);
+  flex-shrink:0
+}
+.feed-list{flex:1;overflow-y:auto}
+.feed-row{
+  padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s
+}
+.feed-row:hover{background:var(--surface2)}
+.feed-row.selected{background:#161f2e;border-left:2px solid var(--accent)}
+.row-top{display:flex;align-items:center;gap:7px}
+.row-time{color:var(--muted);font-size:11px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.row-sym{font-weight:700;font-size:12px}
+.row-dir{font-size:12px;font-weight:700}
+.row-conf{color:var(--muted);font-size:11px}
+.badge{margin-left:auto;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.06em}
+.b-green{background:rgba(63,185,80,.15);color:var(--green)}
+.b-blue{background:rgba(88,166,255,.12);color:var(--accent)}
+.b-red{background:rgba(248,81,73,.12);color:var(--red)}
+.b-yellow{background:rgba(210,153,34,.12);color:var(--yellow)}
+.b-purple{background:rgba(188,140,255,.12);color:var(--purple)}
+.b-muted{background:var(--surface3);color:var(--muted)}
+.row-sub{font-size:10px;color:var(--muted);margin-top:4px;padding-left:2px}
+.row-veto{font-size:10px;color:var(--red);margin-top:3px;padding-left:2px}
+
+/* ── DEBATE PANEL ── */
+.debate{
+  flex-shrink:0;border-top:1px solid var(--border);
+  background:var(--surface);display:flex;flex-direction:column;
+  max-height:55%;overflow:hidden
+}
+.debate-hdr{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 14px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0
+}
+.debate-id{color:var(--accent);font-size:10px}
+.debate-scroll{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.dsec{border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.dsec-head{
+  display:flex;gap:8px;align-items:center;padding:7px 12px;
+  background:var(--surface2);border-left:3px solid transparent;
+  font-size:11px;font-weight:600;border-bottom:1px solid var(--border)
+}
+.dsec-body{padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.drow{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.drow-label{font-size:11px;color:var(--muted);flex-shrink:0}
+.drow-val{font-size:11px;font-weight:500;text-align:right}
+.drow-prose{
+  font-size:11px;color:var(--muted);line-height:1.6;margin-top:6px;
+  padding-top:6px;border-top:1px solid var(--border);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;white-space:pre-wrap
+}
+
+/* ── PULSE DOT ── */
+.pulse{display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--green);margin-right:6px;
+  animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(63,185,80,.4)}
+  50%{opacity:.8;box-shadow:0 0 0 5px rgba(63,185,80,0)}}
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">⚡</span>
+    <span class="brand-name">NEXMIND</span>
+    <span class="brand-sub">Aethel Command Center</span>
+  </div>
+
+  <div class="status-row">
+    <div class="stat">
+      <span class="stat-label">Equity</span>
+      <span class="stat-value">$10,284.50</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Daily P&amp;L</span>
+      <span class="stat-value green">+2.84%</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Trades Today</span>
+      <span class="stat-value">4</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Open Pos</span>
+      <span class="stat-value accent">2</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Veto Rate</span>
+      <span class="stat-value yellow">38%</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Pipeline</span>
+      <span class="stat-value"><span class="pulse"></span><span class="green">LIVE</span></span>
+    </div>
+  </div>
+
+  <button class="kill-btn">🛑 KILL SWITCH</button>
+</header>
+
+<!-- ── SHADOW BANNER ── -->
+<div class="banner">👁&nbsp; SHADOW MODE — orders validated but not sent to broker</div>
+
+<!-- ── MAIN GRID ── -->
+<div class="grid">
+
+  <!-- ════ LEFT ════ -->
+  <div class="left">
+
+    <!-- Symbol Cards -->
+    <div class="sym-grid">
+
+      <!-- EURUSD -->
+      <div class="sym-card">
+        <div class="sym-top">
+          <span class="sym-name">EURUSD</span>
+          <span class="dir-badge green">▲ BUY</span>
+        </div>
+        <div class="conf-row">
+          <div class="conf-bar"><div class="conf-fill" style="width:82%;background:var(--green)"></div></div>
+          <span class="conf-val">82%</span>
+        </div>
+        <div class="levels-grid">
+          <span class="lv">E &nbsp;1.08450</span>
+          <span class="lv" style="color:var(--red)">SL 1.08200</span>
+          <span class="lv" style="color:var(--green)">TP 1.08950</span>
+          <span class="rr">R:R 2.0</span>
+        </div>
+        <span class="state-tag green">EXECUTED</span>
+      </div>
+
+      <!-- GBPUSD -->
+      <div class="sym-card">
+        <div class="sym-top">
+          <span class="sym-name">GBPUSD</span>
+          <span class="dir-badge red">▼ SELL</span>
+        </div>
+        <div class="conf-row">
+          <div class="conf-bar"><div class="conf-fill" style="width:71%;background:var(--green)"></div></div>
+          <span class="conf-val">71%</span>
+        </div>
+        <div class="levels-grid">
+          <span class="lv">E &nbsp;1.27340</span>
+          <span class="lv" style="color:var(--red)">SL 1.27600</span>
+          <span class="lv" style="color:var(--green)">TP 1.26800</span>
+          <span class="rr">R:R 2.1</span>
+        </div>
+        <span class="state-tag red">VETOED</span>
+      </div>
+
+      <!-- USDJPY -->
+      <div class="sym-card">
+        <div class="sym-top">
+          <span class="sym-name">USDJPY</span>
+          <span class="dir-badge green">▲ BUY</span>
+        </div>
+        <div class="conf-row">
+          <div class="conf-bar"><div class="conf-fill" style="width:67%;background:var(--green)"></div></div>
+          <span class="conf-val">67%</span>
+        </div>
+        <div class="levels-grid">
+          <span class="lv">E &nbsp;157.420</span>
+          <span class="lv" style="color:var(--red)">SL 156.900</span>
+          <span class="lv" style="color:var(--green)">TP 158.460</span>
+          <span class="rr">R:R 2.0</span>
+        </div>
+        <span class="state-tag" style="color:var(--accent)">APPROVED</span>
+      </div>
+
+      <!-- XAUUSD -->
+      <div class="sym-card">
+        <div class="sym-top">
+          <span class="sym-name">XAUUSD</span>
+          <span class="dir-badge muted-c">— HOLD</span>
+        </div>
+        <div class="conf-row">
+          <div class="conf-bar"><div class="conf-fill" style="width:43%;background:var(--muted)"></div></div>
+          <span class="conf-val muted-c">43%</span>
+        </div>
+        <div class="levels-grid">
+          <span class="lv" style="grid-column:1/-1;color:var(--muted)">below threshold</span>
+        </div>
+        <span class="state-tag muted-c">SIGNAL</span>
+      </div>
+    </div>
+
+    <!-- Equity Chart -->
+    <div class="card">
+      <div class="card-hdr">Equity Curve</div>
+      <div class="chart-wrap">
+        <svg viewBox="0 0 800 180" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#58a6ff" stop-opacity=".35"/>
+              <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- grid lines -->
+          <line class="chart-grid-line" x1="0" y1="45" x2="800" y2="45"/>
+          <line class="chart-grid-line" x1="0" y1="90" x2="800" y2="90"/>
+          <line class="chart-grid-line" x1="0" y1="135" x2="800" y2="135"/>
+          <line class="chart-grid-line" x1="160" y1="0" x2="160" y2="180"/>
+          <line class="chart-grid-line" x1="320" y1="0" x2="320" y2="180"/>
+          <line class="chart-grid-line" x1="480" y1="0" x2="480" y2="180"/>
+          <line class="chart-grid-line" x1="640" y1="0" x2="640" y2="180"/>
+          <!-- fill -->
+          <polygon class="chart-fill" points="
+            30,140 80,130 130,125 190,118 240,108 290,115
+            340,100 390,85 440,90 490,75 540,68 590,60
+            640,55 690,48 750,42 770,40 770,180 30,180"/>
+          <!-- line -->
+          <polyline class="chart-line" points="
+            30,140 80,130 130,125 190,118 240,108 290,115
+            340,100 390,85 440,90 490,75 540,68 590,60
+            640,55 690,48 750,42 770,40"/>
+          <!-- labels -->
+          <text class="chart-label" x="6" y="48">$10,600</text>
+          <text class="chart-label" x="6" y="93">$10,300</text>
+          <text class="chart-label" x="6" y="138">$10,000</text>
+          <text class="chart-label" x="150" y="175">Jun 9</text>
+          <text class="chart-label" x="312" y="175">Jun 10</text>
+          <text class="chart-label" x="470" y="175">Jun 11</text>
+          <text class="chart-label" x="630" y="175">Jun 12</text>
+          <!-- current value dot -->
+          <circle cx="770" cy="40" r="4" fill="var(--accent)"/>
+          <text class="chart-label" x="718" y="34" style="fill:var(--accent)">$10,284</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics-panels">
+      <!-- Signal counters -->
+      <div class="card">
+        <div class="card-hdr">Signal Pipeline</div>
+        <div class="met-grid">
+          <div class="met-cell"><span class="met-label">Venus signals</span><span class="met-val">1,142</span></div>
+          <div class="met-cell"><span class="met-label">Gate blocked</span><span class="met-val muted-c">988</span></div>
+          <div class="met-cell"><span class="met-label">Agent calls</span><span class="met-val accent">154</span></div>
+          <div class="met-cell"><span class="met-label">Ares failures</span><span class="met-val muted-c">2</span></div>
+          <div class="met-cell"><span class="met-label">Athena approve</span><span class="met-val green">59</span></div>
+          <div class="met-cell"><span class="met-label">Athena veto</span><span class="met-val red">93</span></div>
+          <div class="met-cell"><span class="met-label">Risk rejected</span><span class="met-val yellow">11</span></div>
+          <div class="met-cell"><span class="met-label">Orders shadow</span><span class="met-val accent">48</span></div>
+          <div class="met-cell"><span class="met-label">Kill sw. blocks</span><span class="met-val muted-c">0</span></div>
+        </div>
+      </div>
+
+      <!-- Latency -->
+      <div class="card">
+        <div class="card-hdr">Stage Latency (ms avg)</div>
+        <div class="lat-grid">
+          <div class="lat-row">
+            <span class="lat-name">venus</span>
+            <div class="lat-bar"><div class="lat-fill" style="width:1%"></div></div>
+            <span class="lat-ms">18</span>
+            <span class="lat-max">max 42</span>
+          </div>
+          <div class="lat-row">
+            <span class="lat-name">ares</span>
+            <div class="lat-bar"><div class="lat-fill" style="width:58%"></div></div>
+            <span class="lat-ms">1,740</span>
+            <span class="lat-max">max 3,100</span>
+          </div>
+          <div class="lat-row">
+            <span class="lat-name">athena</span>
+            <div class="lat-bar"><div class="lat-fill" style="width:72%"></div></div>
+            <span class="lat-ms">2,180</span>
+            <span class="lat-max">max 4,200</span>
+          </div>
+          <div class="lat-row">
+            <span class="lat-name">risk_gate</span>
+            <div class="lat-bar"><div class="lat-fill" style="width:1%"></div></div>
+            <span class="lat-ms">4</span>
+            <span class="lat-max">max 12</span>
+          </div>
+          <div class="lat-row">
+            <span class="lat-name">hermes</span>
+            <div class="lat-bar"><div class="lat-fill" style="width:1%"></div></div>
+            <span class="lat-ms">8</span>
+            <span class="lat-max">max 22</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LLM Cost -->
+      <div class="card">
+        <div class="card-hdr">LLM Cost — Session</div>
+        <div class="cost-row"><span class="cost-provider">deepseek (Ares)</span><span class="cost-val">$0.0041</span></div>
+        <div class="cost-row"><span class="cost-provider">anthropic (Athena)</span><span class="cost-val">$0.0318</span></div>
+        <div class="cost-row"><span class="cost-provider">gemini (Mnemosyne)</span><span class="cost-val">$0.0009</span></div>
+      </div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- ════ RIGHT ════ -->
+  <div class="right">
+
+    <!-- Decision Feed -->
+    <div class="feed">
+      <div class="feed-hdr">
+        <span>Decision Feed</span>
+        <span>50 decisions</span>
+      </div>
+      <div class="feed-list">
+
+        <div class="feed-row selected">
+          <div class="row-top">
+            <span class="row-time">14:32:01</span>
+            <span class="row-sym">EURUSD</span>
+            <span class="row-dir green">▲</span>
+            <span class="row-conf">82%</span>
+            <span class="badge b-green">EXEC</span>
+          </div>
+          <div class="row-sub">E 1.08450 &nbsp;<span style="color:var(--red)">SL 1.08200</span>&nbsp;<span style="color:var(--green)">TP 1.08950</span>&nbsp; R:R 2.0</div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">14:28:15</span>
+            <span class="row-sym">GBPUSD</span>
+            <span class="row-dir red">▼</span>
+            <span class="row-conf">71%</span>
+            <span class="badge b-red">VETO</span>
+          </div>
+          <div class="row-veto">⊘ NFP release in 25 min — blackout window active</div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">14:15:00</span>
+            <span class="row-sym">USDJPY</span>
+            <span class="row-dir green">▲</span>
+            <span class="row-conf">67%</span>
+            <span class="badge b-red">RISK ✗</span>
+          </div>
+          <div class="row-veto">⊘ risk: spread — 4.2 pips &gt; max 3.0</div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">14:02:30</span>
+            <span class="row-sym">EURUSD</span>
+            <span class="row-dir green">▲</span>
+            <span class="row-conf">78%</span>
+            <span class="badge b-green">EXEC</span>
+          </div>
+          <div class="row-sub">E 1.08210 &nbsp;<span style="color:var(--red)">SL 1.08010</span>&nbsp;<span style="color:var(--green)">TP 1.08610</span></div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">13:55:10</span>
+            <span class="row-sym">XAUUSD</span>
+            <span class="row-dir muted-c">—</span>
+            <span class="row-conf">43%</span>
+            <span class="badge b-muted">GATED</span>
+          </div>
+          <div class="row-sub">below confidence threshold (0.65)</div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">13:40:00</span>
+            <span class="row-sym">GBPUSD</span>
+            <span class="row-dir red">▼</span>
+            <span class="row-conf">69%</span>
+            <span class="badge b-purple">CLSD</span>
+          </div>
+          <div class="row-sub" style="color:var(--green)">+$48.20 &nbsp; profit target hit</div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">13:21:45</span>
+            <span class="row-sym">USDJPY</span>
+            <span class="row-dir green">▲</span>
+            <span class="row-conf">73%</span>
+            <span class="badge b-yellow">PROP</span>
+          </div>
+          <div class="row-sub">E 157.100 &nbsp;<span style="color:var(--red)">SL 156.750</span>&nbsp;<span style="color:var(--green)">TP 157.800</span></div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">13:05:00</span>
+            <span class="row-sym">EURUSD</span>
+            <span class="row-dir red">▼</span>
+            <span class="row-conf">66%</span>
+            <span class="badge b-red">VETO</span>
+          </div>
+          <div class="row-veto">⊘ current drawdown -1.8% — risk threshold elevated</div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">12:50:20</span>
+            <span class="row-sym">XAUUSD</span>
+            <span class="row-dir green">▲</span>
+            <span class="row-conf">81%</span>
+            <span class="badge b-green">EXEC</span>
+          </div>
+          <div class="row-sub">E 2,318.40 &nbsp;<span style="color:var(--red)">SL 2,308.00</span>&nbsp;<span style="color:var(--green)">TP 2,339.20</span></div>
+        </div>
+
+        <div class="feed-row">
+          <div class="row-top">
+            <span class="row-time">12:30:00</span>
+            <span class="row-sym">GBPUSD</span>
+            <span class="row-dir green">▲</span>
+            <span class="row-conf">68%</span>
+            <span class="badge b-muted">GATED</span>
+          </div>
+          <div class="row-sub">cooldown active — last signal 8 min ago</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Agent Debate Panel (for selected EURUSD row) -->
+    <div class="debate">
+      <div class="debate-hdr">
+        <span>Agent Debate — EURUSD &nbsp;<span class="debate-id">a3f8c12b</span></span>
+        <span style="cursor:pointer;color:var(--muted)">✕</span>
+      </div>
+      <div class="debate-scroll">
+
+        <!-- Venus -->
+        <div class="dsec">
+          <div class="dsec-head" style="border-left-color:var(--accent)">
+            <span>⊕</span><span style="color:var(--accent)">Venus — ML Signal</span>
+          </div>
+          <div class="dsec-body">
+            <div class="drow"><span class="drow-label">Direction</span><span class="drow-val green">BUY</span></div>
+            <div class="drow"><span class="drow-label">Confidence</span><span class="drow-val">82.3%</span></div>
+            <div class="drow"><span class="drow-label">Model version</span><span class="drow-val muted-c">20260612-0537</span></div>
+            <div class="drow"><span class="drow-label">dist_ema50</span><span class="drow-val">+0.3421</span></div>
+            <div class="drow"><span class="drow-label">rsi</span><span class="drow-val">0.6180</span></div>
+            <div class="drow"><span class="drow-label">vp_poc_dist</span><span class="drow-val accent">+0.8820</span></div>
+            <div class="drow"><span class="drow-label">atr_pctile</span><span class="drow-val">0.7200</span></div>
+            <div class="drow"><span class="drow-label">sess_london</span><span class="drow-val green">1.0000</span></div>
+          </div>
+        </div>
+
+        <!-- Ares -->
+        <div class="dsec">
+          <div class="dsec-head" style="border-left-color:var(--yellow)">
+            <span>🗡</span><span style="color:var(--yellow)">Ares (DeepSeek) — Proposal</span>
+          </div>
+          <div class="dsec-body">
+            <div class="drow"><span class="drow-label">Action</span><span class="drow-val green">BUY</span></div>
+            <div class="drow"><span class="drow-label">Entry</span><span class="drow-val">1.08450</span></div>
+            <div class="drow"><span class="drow-label">Stop Loss</span><span class="drow-val red">1.08200</span></div>
+            <div class="drow"><span class="drow-label">Take Profit</span><span class="drow-val green">1.08950</span></div>
+            <div class="drow"><span class="drow-label">Risk %</span><span class="drow-val">0.5%</span></div>
+            <div class="drow"><span class="drow-label">Risk:Reward</span><span class="drow-val yellow">2.0</span></div>
+            <p class="drow-prose">Price has broken above the 1.0840 resistance zone on the M15 chart with a clean close. The H1 EMA-50 is trending upward and Venus confirms strong bullish momentum. Entry at the breakout level with SL below the previous structure low at 1.0820.</p>
+          </div>
+        </div>
+
+        <!-- Athena -->
+        <div class="dsec">
+          <div class="dsec-head" style="border-left-color:var(--green)">
+            <span>🦉</span><span style="color:var(--green)">Athena (Claude) — APPROVE</span>
+          </div>
+          <div class="dsec-body">
+            <div class="drow"><span class="drow-label">Verdict</span><span class="drow-val green">✓ APPROVE</span></div>
+            <div class="drow"><span class="drow-label">Daily drawdown</span><span class="drow-val">-0.42%</span></div>
+            <div class="drow"><span class="drow-label">Upcoming news</span><span class="drow-val muted-c">none (3h clear)</span></div>
+            <p class="drow-prose">Proposal is structurally sound. SL placed below a confirmed support level with adequate buffer. R:R of 2.0 meets minimum threshold. No high-impact USD/EUR releases within the 30-minute blackout window. Current daily drawdown is within acceptable range. Approving.</p>
+          </div>
+        </div>
+
+        <!-- Risk Gate -->
+        <div class="dsec">
+          <div class="dsec-head" style="border-left-color:var(--green)">
+            <span>🛡</span><span style="color:var(--green)">Risk Gate — PASSED</span>
+          </div>
+          <div class="dsec-body">
+            <div class="drow"><span class="drow-label">Lots computed</span><span class="drow-val">0.10</span></div>
+            <div class="drow"><span class="drow-label">Spread</span><span class="drow-val green">1.1 pips ✓</span></div>
+            <div class="drow"><span class="drow-label">News blackout</span><span class="drow-val green">clear ✓</span></div>
+            <div class="drow"><span class="drow-label">Net USD exposure</span><span class="drow-val green">-0.8 lots ✓</span></div>
+            <div class="drow"><span class="drow-label">TTL remaining</span><span class="drow-val">48s</span></div>
+          </div>
+        </div>
+
+        <!-- Hermes -->
+        <div class="dsec">
+          <div class="dsec-head" style="border-left-color:var(--muted)">
+            <span>⚡</span><span style="color:var(--muted)">Hermes — SHADOW</span>
+          </div>
+          <div class="dsec-body">
+            <div class="drow"><span class="drow-label">Mode</span><span class="drow-val muted-c">Shadow — logged, not sent</span></div>
+            <div class="drow"><span class="drow-label">Lots</span><span class="drow-val">0.10</span></div>
+            <div class="drow"><span class="drow-label">Order type</span><span class="drow-val">BUY LIMIT</span></div>
+            <div class="drow"><span class="drow-label">Expiry</span><span class="drow-val muted-c">300s</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /debate -->
+
+  </div><!-- /right -->
+</div><!-- /grid -->
+
+</body>
+</html>
