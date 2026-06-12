@@ -67,14 +67,13 @@ class LLMClient:
                 json={
                     "model": self.s.anthropic_model,
                     "max_tokens": 2048,
-                    "system": system,
-                    "messages": [{"role": "user", "content": user},
-                                 {"role": "assistant", "content": "{"}],
+                    "system": system + "\nRespond with ONLY a raw JSON object — no prose, no code fences.",
+                    "messages": [{"role": "user", "content": user}],
                     "temperature": 0.2,
                 },
             )
             r.raise_for_status()
-            return "{" + r.json()["content"][0]["text"]
+            return r.json()["content"][0]["text"]
 
         if provider == "gemini":
             r = await self._http.post(
