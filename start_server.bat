@@ -68,18 +68,19 @@ echo       OK
 
 REM -- start Next.js frontend in a new window --
 echo [3/4] Starting frontend...
-if exist "frontend\package.json" (
-    if not exist "frontend\node_modules" (
-        echo       Installing node modules (first run, takes a few minutes)...
-        pushd frontend
-        call npm install --silent
-        popd
-    )
-    start "Aethel Frontend" /min cmd /c "cd /d %~dp0frontend && npm start"
-    echo       Frontend starting at http://localhost:3000
-) else (
-    echo       frontend folder not found - skipping
-)
+if not exist "frontend\package.json" goto skip_frontend
+if exist "frontend\node_modules" goto start_frontend
+echo       Installing node modules (first run, takes a few minutes)...
+pushd frontend
+call npm install --silent
+popd
+:start_frontend
+start "Aethel Frontend" /min cmd /c "cd /d "%~dp0frontend" && npm start"
+echo       Frontend starting at http://localhost:3000
+goto after_frontend
+:skip_frontend
+echo       frontend folder not found - skipping
+:after_frontend
 
 REM -- start API + orchestrator --
 echo [4/4] Starting Aethel API + orchestrator...
