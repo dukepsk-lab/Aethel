@@ -13,12 +13,10 @@ import { AgentDebate } from "./components/AgentDebate";
 import { MetricsPanel } from "./components/MetricsPanel";
 import { SymbolCards } from "./components/SymbolCards";
 import { KillSwitch } from "./components/KillSwitch";
+import { API, fetcher } from "./lib/api";
 import styles from "./page.module.css";
 
 type FeedTab = "decisions" | "signals" | "shadow" | "trades";
-
-export const API = process.env.NEXT_PUBLIC_AETHEL_API ?? "http://localhost:8000";
-export const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function Dashboard() {
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);

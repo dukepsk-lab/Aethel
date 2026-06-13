@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { API } from "../page";
+import { API } from "../lib/api";
 import styles from "./KillSwitch.module.css";
 
 export function KillSwitch({ tripped, onTrip }: { tripped: boolean; onTrip: () => void }) {
