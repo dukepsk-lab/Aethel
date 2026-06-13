@@ -47,8 +47,18 @@ def run_backtest(
     from aethel.venus.calibration import Calibrator
     from aethel.venus.model import VenusNet
 
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"[backtest] device: {device}", flush=True)
+
     print("[backtest] building dataset...", flush=True)
     x, y, t_end, meta = build_dataset(m5)
+    y = y.to(device)
+    x = {tf: t.to(device) for tf, t in x.items()}
     print(f"[backtest] dataset ready: {len(y)} samples", flush=True)
     n = len(y)
 
@@ -70,7 +80,7 @@ def run_backtest(
 
     for fold_idx, (tr, te) in enumerate(folds, 1):
         print(f"\n[fold {fold_idx}/{len(folds)}] train={len(tr)} test={len(te)}")
-        model = VenusNet(n_features=len(FEATURE_COLUMNS))
+        model = VenusNet(n_features=len(FEATURE_COLUMNS)).to(device)
         opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
         loss_fn = torch.nn.BCEWithLogitsLoss()
         for ep in range(1, epochs + 1):
@@ -89,7 +99,7 @@ def run_backtest(
             print(f"  epoch {ep:>2}/{epochs}  loss={avg_loss:.4f}", flush=True)
         model.eval()
         with torch.no_grad():
-            raw = torch.sigmoid(model({tf: x[tf][te] for tf in SEQ})).numpy()
+            raw = torch.sigmoid(model({tf: x[tf][te] for tf in SEQ})).cpu().numpy()
         y_te = y[te].numpy()
         try:
             from sklearn.metrics import roc_auc_score
