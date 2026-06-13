@@ -39,13 +39,17 @@ def run_backtest(
     epochs: int = 10,
     n_splits: int = 5,
 ) -> dict:
+    print("[backtest] loading torch...", flush=True)
     import torch
+    print("[backtest] loading vectorbt...", flush=True)
     import vectorbt as vbt
 
     from aethel.venus.calibration import Calibrator
     from aethel.venus.model import VenusNet
 
+    print("[backtest] building dataset...", flush=True)
     x, y, t_end, meta = build_dataset(m5)
+    print(f"[backtest] dataset ready: {len(y)} samples", flush=True)
     n = len(y)
 
     m15 = m5.resample("15min").agg(
