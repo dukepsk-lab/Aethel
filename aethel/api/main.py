@@ -198,6 +198,7 @@ async def risk_status():
             "daily_pnl_pct": await store.daily_pnl_pct(account.equity),
             "trades_today": await store.trades_today(),
             "kill_switch_tripped": await store.is_tripped(),
+            "shadow_mode": get_settings().shadow_mode,
             "open_positions": account.open_positions,
         }
 

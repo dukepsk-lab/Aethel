@@ -82,7 +82,7 @@ export default function Dashboard() {
       </header>
 
       {/* ── SHADOW MODE BANNER ── */}
-      {risk && !risk.kill_switch_tripped && (
+      {risk?.shadow_mode && !risk.kill_switch_tripped && (
         <div className={styles.shadowBanner}>
           <span>👁 SHADOW MODE — orders validated but not sent to broker</span>
         </div>
