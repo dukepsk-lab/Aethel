@@ -160,8 +160,8 @@ async def shadow_trades(limit: int = 50):
 
 @app.get("/news")
 async def news():
-    """Upcoming calendar events (12h horizon) for traded symbols, plus the
-    per-symbol blackout flag the Risk Gate is currently enforcing."""
+    """Upcoming calendar events (12h horizon) and recent events (last 6h) for
+    traded symbols, plus the per-symbol blackout flag the Risk Gate is enforcing."""
     s = get_settings()
     events, seen = [], set()
     blackout = {}
@@ -173,10 +173,15 @@ async def news():
                 key = (e.time, e.currency, e.title)
                 if key not in seen:
                     seen.add(key)
-                    events.append(e.model_dump(mode="json"))
+                    events.append({**e.model_dump(mode="json"), "upcoming": True})
+            for e in await _news.recent_for_symbol(sym, hours_back=6):
+                key = (e.time, e.currency, e.title)
+                if key not in seen:
+                    seen.add(key)
+                    events.append({**e.model_dump(mode="json"), "upcoming": False})
         except Exception:
             blackout[sym] = None  # feed down — risk gate handles its own fetch
-    events.sort(key=lambda e: e["time"])
+    events.sort(key=lambda e: e["time"], reverse=True)
     return {"events": events, "blackout": blackout,
             "blackout_minutes": s.news_blackout_minutes}
 

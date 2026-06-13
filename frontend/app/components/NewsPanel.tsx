@@ -27,15 +27,18 @@ export function NewsPanel({ news }: { news: any }) {
       )}
 
       <div className={styles.list}>
-        {!events.length && <div className={styles.empty}>No upcoming events in the next 12h</div>}
+        {!events.length && <div className={styles.empty}>No events in the last 6h or next 12h</div>}
         {events.map((e: any, i: number) => (
-          <div key={`${e.time}-${e.title}-${i}`} className={styles.row}>
+          <div key={`${e.time}-${e.title}-${i}`} className={clsx(styles.row, e.upcoming === false && styles.past)}>
             <span className={styles.time}>
               {new Date(e.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
             <span className={styles.ccy}>{e.currency}</span>
             <span className={clsx(styles.impact, styles[IMPACT_CLS[e.impact] ?? "low"])}>
               {e.impact === "high" ? "●●●" : e.impact === "medium" ? "●●" : "●"}
+            </span>
+            <span className={styles.badge}>
+              {e.upcoming === false ? "[Released]" : "[Upcoming]"}
             </span>
             <span className={styles.title}>{e.title}</span>
             {(e.forecast || e.previous) && (

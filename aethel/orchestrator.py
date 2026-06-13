@@ -74,20 +74,28 @@ class Orchestrator:
 
     async def run_forever(self) -> None:
         log.info("aethel_started", shadow_mode=self.s.shadow_mode, symbols=SYMBOLS)
+        await send_alert(f"✅ Aethel started — {'SHADOW' if self.s.shadow_mode else 'LIVE'} mode | symbols: {', '.join(SYMBOLS)}")
         asyncio.create_task(self._weekly_audit_loop())
-        while True:
-            for symbol in self.venus:
+        try:
+            while True:
+                for symbol in self.venus:
+                    try:
+                        await self.process_symbol(symbol)
+                    except Exception as e:
+                        log.error("pipeline_error", symbol=symbol, error=str(e))
+                        metrics.incr("pipeline_errors")
                 try:
-                    await self.process_symbol(symbol)
+                    await self.trade_manager.manage_all()
                 except Exception as e:
-                    # fail closed: log, alert, move on — never trade through an error
-                    log.error("pipeline_error", symbol=symbol, error=str(e))
-                    metrics.incr("pipeline_errors")
+                    log.error("management_error", error=str(e))
+                await asyncio.sleep(300)  # one pass per M5 close
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            log.info("aethel_stopping")
             try:
-                await self.trade_manager.manage_all()
-            except Exception as e:
-                log.error("management_error", error=str(e))
-            await asyncio.sleep(300)  # one pass per M5 close
+                await send_alert("🔴 Aethel stopped — server shutdown")
+            except Exception:
+                pass
+            raise
 
     async def process_symbol(self, symbol: str) -> None:
         # 1. Venus signal
@@ -107,6 +115,9 @@ class Orchestrator:
             metrics.incr("gate_blocked")
             return
         self.signal_gate.record_consultation(symbol)
+        await send_alert(
+            f"📡 Signal | {symbol} | {signal.direction.value} | conf={signal.confidence:.2f} | entering agent review"
+        )
 
         # advisory context — failure here must never block the pipeline
         try:
@@ -206,6 +217,10 @@ class Orchestrator:
                 record.ticket = result.ticket
                 await risk_store.record_trade()
                 metrics.incr("orders_shadow" if result.shadow else "orders_live")
+                mode = "SHADOW" if result.shadow else "LIVE"
+                await send_alert(
+                    f"{'👁' if result.shadow else '✅'} Trade {mode} | {symbol} | {decision.proposal.action} | ticket={result.ticket}"
+                )
             else:
                 metrics.incr("orders_failed")
                 await send_alert(f"⚠️ Order failed {symbol}: {result.detail}")

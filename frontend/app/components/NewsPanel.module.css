@@ -47,3 +47,6 @@
 .low { color: var(--muted); }
 .title { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .figures { margin-left: auto; color: var(--muted); font-size: 10px; flex-shrink: 0; }
+.badge { font-size: 9px; color: var(--muted); flex-shrink: 0; letter-spacing: 0.04em; }
+.past { opacity: 0.55; }
+.past .badge { color: var(--muted); }
