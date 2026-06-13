@@ -61,13 +61,17 @@ def run_backtest(
     fold_aucs = []
 
     splitter = PurgedWalkForward(n_splits=n_splits, embargo_bars=100)
-    for tr, te in splitter.split(n, t_end):
-        if len(tr) < 200:
-            continue
+    folds = [(tr, te) for tr, te in splitter.split(n, t_end) if len(tr) >= 200]
+    print(f"[backtest] {len(folds)} folds | {n} samples | threshold={threshold}")
+
+    for fold_idx, (tr, te) in enumerate(folds, 1):
+        print(f"\n[fold {fold_idx}/{len(folds)}] train={len(tr)} test={len(te)}")
         model = VenusNet(n_features=len(FEATURE_COLUMNS))
         opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
         loss_fn = torch.nn.BCEWithLogitsLoss()
-        for _ in range(epochs):
+        for ep in range(1, epochs + 1):
+            epoch_loss = 0.0
+            n_batches = 0
             perm = np.random.permutation(tr)
             for i in range(0, len(perm), 256):
                 idx = perm[i:i + 256]
@@ -75,6 +79,10 @@ def run_backtest(
                 loss = loss_fn(model({tf: x[tf][idx] for tf in SEQ}), y[idx])
                 loss.backward()
                 opt.step()
+                epoch_loss += float(loss)
+                n_batches += 1
+            avg_loss = epoch_loss / max(n_batches, 1)
+            print(f"  epoch {ep:>2}/{epochs}  loss={avg_loss:.4f}", flush=True)
         model.eval()
         with torch.no_grad():
             raw = torch.sigmoid(model({tf: x[tf][te] for tf in SEQ})).numpy()
@@ -82,9 +90,12 @@ def run_backtest(
         try:
             from sklearn.metrics import roc_auc_score
 
-            fold_aucs.append(round(float(roc_auc_score(y_te, raw)), 4))
+            auc = round(float(roc_auc_score(y_te, raw)), 4)
+            fold_aucs.append(auc)
+            print(f"  OOF AUC={auc}")
         except ValueError:
             fold_aucs.append(None)
+            print("  OOF AUC=n/a (single class in test fold)")
 
         if prior_raw:  # calibrate on previous folds only — leak-free
             cal = Calibrator()
