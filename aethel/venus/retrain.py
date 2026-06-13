@@ -120,3 +120,51 @@ def run_retrain_cycle(symbol: str, data_path: Path,
     _save_registry(reg)
     _try_mlflow_log(symbol, bench, action)
     return {"symbol": symbol, "action": action, "benchmark": bench}
+
+
+if __name__ == "__main__":
+    import argparse
+    import json
+
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s")
+
+    ap = argparse.ArgumentParser(
+        description="Run Venus retrain cycle locally, then optionally deploy "
+                    "model artifacts to a remote VPS via rsync."
+    )
+    ap.add_argument("--symbol", required=True,
+                    help="Symbol to retrain, e.g. EURUSD")
+    ap.add_argument("--data", required=True, type=Path,
+                    help="Path to M5 parquet file for this symbol")
+    ap.add_argument("--out-dir", type=Path, default=None,
+                    help="Override output dir (default: models/artifacts/<symbol>)")
+    ap.add_argument("--force", action="store_true",
+                    help="Promote even if promotion bar is not met (use for first run)")
+    ap.add_argument("--epochs", type=int, default=20,
+                    help="Training epochs for the full champion model (default: 20)")
+    ap.add_argument("--deploy", metavar="USER@HOST",
+                    help="rsync artifacts to VPS after training, e.g. ubuntu@1.2.3.4")
+    ap.add_argument("--deploy-path", default="~/aethel/models/artifacts",
+                    help="Remote destination path (default: ~/aethel/models/artifacts)")
+    ap.add_argument("--deploy-key", metavar="PATH",
+                    help="SSH identity file for rsync (optional)")
+    args = ap.parse_args()
+
+    result = run_retrain_cycle(args.symbol, args.data,
+                               out_dir=args.out_dir, force=args.force)
+    print(json.dumps(result, indent=2, default=str))
+
+    if args.deploy and result["action"] == "promoted":
+        import subprocess
+        local_dir = str(ARTIFACTS / args.symbol) + "/"
+        remote = f"{args.deploy}:{args.deploy_path}/{args.symbol}/"
+        cmd = ["rsync", "-avz", "--mkpath"]
+        if args.deploy_key:
+            cmd += ["-e", f"ssh -i {args.deploy_key}"]
+        cmd += [local_dir, remote]
+        print(f"\n→ deploying to {remote}")
+        subprocess.run(cmd, check=True)
+        print("✓ deploy complete — restart the bot on VPS to load the new model")
+    elif args.deploy and result["action"] == "skipped":
+        print("\n↷ promotion bar not met — nothing deployed (use --force to override)")
