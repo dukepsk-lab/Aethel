@@ -13,3 +13,4 @@ node_modules/
 .next/
 frontend/.env*
 logs/
+.claude/
