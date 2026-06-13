@@ -37,6 +37,7 @@ from aethel.mt5 import MT5Client
 from aethel.news.calendar import JsonFeedCalendar, NewsService
 from aethel.observability.alerts import send_alert
 from aethel.observability.audit import gather_weekly_stats
+from aethel.observability.export import export_audit_markdown
 from aethel.observability.metrics import metrics
 from aethel.observability.signal_log import signal_log
 from aethel.risk_gate.gate import RiskGate
@@ -136,7 +137,8 @@ class Orchestrator:
                 with metrics.time_stage("ares"):
                     tick = await self.mt5.get_tick(symbol)
                     notes = await memory.recall(
-                        symbol, " ".join(f"{k}={v}" for k, v in signal.features.items()))
+                        symbol, " ".join(f"{k}={v}" for k, v in signal.features.items()),
+                        regime=regime["label"] if regime else None)
                     proposal = await self.ares.propose(
                         signal, candles[Timeframe.M15], tick, notes, regime)
             except (LLMUnavailable, ValueError) as e:
@@ -229,6 +231,10 @@ class Orchestrator:
                     stats = await gather_weekly_stats(session, account.equity)
                 audit = await self.themis.audit(stats)
                 await send_alert(self.themis.format_report(audit))
+                try:
+                    export_audit_markdown(audit.model_dump())
+                except Exception as e:  # markdown export is best-effort
+                    log.warning("audit_export_failed", error=str(e))
                 metrics.incr("themis_audits")
                 log.info("themis_audit_complete", grade=audit.grade)
             except Exception as e:
@@ -245,6 +251,7 @@ class Orchestrator:
         sessionmaker = get_sessionmaker()
         async with sessionmaker() as session:
             memory = MemoryStore(session)
+            regime_ctx = trade_context.get("regime")
             await memory.store(
                 decision_id=decision_id,
                 symbol=trade_context["symbol"],
@@ -252,6 +259,9 @@ class Orchestrator:
                 profit=trade_context["profit"],
                 lesson=lesson.lesson,
                 context_tags=lesson.context_tags,
+                ares_quality=lesson.ares_quality,
+                athena_quality=lesson.athena_quality,
+                regime=regime_ctx.get("label") if isinstance(regime_ctx, dict) else regime_ctx,
             )
             record = await session.get(Decision, decision_id)
             if record:

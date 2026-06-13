@@ -70,6 +70,14 @@ async def gather_weekly_stats(session: AsyncSession, equity: float) -> dict:
         select(func.count(TradeMemory.id)).where(TradeMemory.created_at >= since)
     )).scalar() or 0
 
+    # Mnemosyne's hindsight quality scores, averaged over the week.
+    quality_row = (await session.execute(
+        select(func.avg(TradeMemory.ares_quality), func.avg(TradeMemory.athena_quality))
+        .where(TradeMemory.created_at >= since)
+    )).one_or_none()
+    avg_ares_q = round(float(quality_row[0]), 2) if quality_row and quality_row[0] else None
+    avg_athena_q = round(float(quality_row[1]), 2) if quality_row and quality_row[1] else None
+
     counters = dict(metrics.counters)
     return {
         "window_days": 7,
@@ -80,6 +88,8 @@ async def gather_weekly_stats(session: AsyncSession, equity: float) -> dict:
         "per_symbol": per_symbol,
         "decision_states": decision_states,  # incl. VETOED / RISK_REJECTED counts
         "lessons_recorded": lesson_quality,
+        "avg_ares_quality": avg_ares_q,
+        "avg_athena_quality": avg_athena_q,
         "gate_blocked": counters.get("gate_blocked", 0),
         "risk_rejections": {k.removeprefix("risk_reject_"): v
                             for k, v in counters.items()

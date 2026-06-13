@@ -78,4 +78,10 @@ class TradeMemory(Base):
     lesson: Mapped[str] = mapped_column(Text)
     context_tags: Mapped[dict] = mapped_column(JSON)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
+    # Mnemosyne's hindsight quality scores (1-5) — previously computed and
+    # discarded; persisted now so Themis and retrieval can learn from them.
+    ares_quality: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    athena_quality: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Regime tag at decision time — enables regime-aware memory retrieval.
+    regime: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

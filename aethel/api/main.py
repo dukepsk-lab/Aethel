@@ -66,6 +66,15 @@ async def get_metrics():
     return metrics.snapshot()
 
 
+@app.get("/retrain/status")
+async def retrain_status():
+    """Venus model registry — per-symbol last retrain time, action taken and
+    the benchmark metrics that decided promotion."""
+    from aethel.venus.retrain import get_registry
+
+    return get_registry()
+
+
 @app.get("/signals")
 async def signals(limit: int = 100):
     """Every Venus signal evaluation — including gate-blocked ones with the

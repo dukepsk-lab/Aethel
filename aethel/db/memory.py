@@ -38,17 +38,26 @@ class MemoryStore:
         self.session = session
 
     async def store(self, decision_id: str, symbol: str, won: bool, profit: float,
-                    lesson: str, context_tags: list[str]) -> None:
+                    lesson: str, context_tags: list[str],
+                    ares_quality: int | None = None,
+                    athena_quality: int | None = None,
+                    regime: str | None = None) -> None:
         embedding = await embed_text(f"{symbol} {' '.join(context_tags)} {lesson}")
         self.session.add(TradeMemory(
             decision_id=decision_id, symbol=symbol, won=won, profit=profit,
             lesson=lesson, context_tags={"tags": context_tags},
-            embedding=embedding, created_at=utcnow(),
+            embedding=embedding, ares_quality=ares_quality,
+            athena_quality=athena_quality, regime=regime, created_at=utcnow(),
         ))
         await self.session.commit()
 
-    async def recall(self, symbol: str, context: str, k_per_side: int = 3) -> list[str]:
-        """Top-k similar wins AND top-k similar losses, plus aggregate stats."""
+    async def recall(self, symbol: str, context: str, k_per_side: int = 3,
+                     regime: str | None = None) -> list[str]:
+        """Top-k similar wins AND top-k similar losses, plus aggregate stats.
+
+        When ``regime`` is given, retrieval is filtered to memories formed in
+        the same regime — the most transferable context — falling back to the
+        unfiltered set if too few same-regime memories exist."""
         try:
             query_vec = await embed_text(f"{symbol} {context}")
         except httpx.HTTPError:
@@ -62,6 +71,14 @@ class MemoryStore:
                 .order_by(TradeMemory.embedding.cosine_distance(query_vec))
                 .limit(k_per_side)
             )
+            if regime is not None:
+                regime_stmt = stmt.where(TradeMemory.regime == regime)
+                rows = list((await self.session.execute(regime_stmt)).scalars())
+                if rows:
+                    for m in rows:
+                        outcome = "WIN" if won else "LOSS"
+                        notes.append(f"[{outcome} {m.profit:+.2f}] {m.lesson}")
+                    continue  # got same-regime memories; skip the unfiltered query
             for m in (await self.session.execute(stmt)).scalars():
                 outcome = "WIN" if won else "LOSS"
                 notes.append(f"[{outcome} {m.profit:+.2f}] {m.lesson}")

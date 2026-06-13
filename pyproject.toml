@@ -15,12 +15,14 @@ dependencies = [
     "numpy>=1.26",
     "pandas>=2.2",
     "scikit-learn>=1.5",
+    "scipy>=1.12",
     "structlog>=24.1",
     "litellm>=1.40",
 ]
 
 [project.optional-dependencies]
 ml = ["torch>=2.3"]
+tracking = ["mlflow>=2.13"]  # optional experiment tracking for Venus retrains
 backtest = ["vectorbt>=0.26"]
 audit = ["quantstats>=0.0.62"]  # nicer Sharpe etc. for Themis; native fallback exists
 mt5 = ["MetaTrader5>=5.0.45"]  # Windows only — install on the gateway host
