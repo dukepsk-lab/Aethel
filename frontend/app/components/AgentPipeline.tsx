@@ -17,7 +17,7 @@ export function AgentPipeline({ metrics, decisions }: { metrics: any; decisions:
   // derive per-stage activity from counters
   const stageData: Record<string, { count: number; avgMs: number | null; active: boolean }> = {
     venus:  { count: c.venus_signals ?? 0,   avgMs: lat.venus?.avg_ms ?? null,    active: (c.venus_signals ?? 0) > 0 },
-    ares:   { count: c.athena_approve + c.athena_veto + (c.ares_failures ?? 0) ?? 0, avgMs: lat.ares?.avg_ms ?? null, active: (lat.ares?.avg_ms ?? 0) > 0 },
+    ares:   { count: (c.athena_approve ?? 0) + (c.athena_veto ?? 0) + (c.ares_failures ?? 0), avgMs: lat.ares?.avg_ms ?? null, active: (lat.ares?.avg_ms ?? 0) > 0 },
     apollo: { count: c.apollo_briefs ?? 0,   avgMs: lat.apollo?.avg_ms ?? null,   active: (c.apollo_briefs ?? 0) > 0 },
     athena: { count: (c.athena_approve ?? 0) + (c.athena_veto ?? 0), avgMs: lat.athena?.avg_ms ?? null, active: ((c.athena_approve ?? 0) + (c.athena_veto ?? 0)) > 0 },
     risk:   { count: (c.athena_approve ?? 0), avgMs: lat.risk_gate?.avg_ms ?? null, active: (lat.risk_gate?.avg_ms ?? 0) > 0 },

@@ -19,6 +19,8 @@ export function EquityChart({
     let chart: any;
     import("lightweight-charts").then(({ createChart, LineSeries }) => {
       chart = createChart(ref.current!, {
+        width: ref.current!.clientWidth,
+        height: ref.current!.clientHeight,
         layout: { background: { color: "transparent" }, textColor: "#7d8590" },
         grid: { vertLines: { color: "#21262d" }, horzLines: { color: "#21262d" } },
         crosshair: { vertLine: { color: "#58a6ff55" }, horzLine: { color: "#58a6ff55" } },
@@ -61,7 +63,10 @@ export function EquityChart({
           value: parseFloat(equity.toFixed(2)),
         };
       });
-    if (points.length) seriesRef.current.setData(points);
+    if (points.length) {
+      seriesRef.current.setData(points);
+      chartRef.current?.timeScale().fitContent();
+    }
   }, [trades, currentEquity]);
 
   return (

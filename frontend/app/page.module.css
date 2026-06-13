@@ -12,8 +12,9 @@
   gap: 24px;
   padding: 0 20px;
   height: 56px;
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 0 rgba(88, 166, 255, 0.08);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -22,13 +23,13 @@
 
 .brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .logo { font-size: 18px; }
-.brandName { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: 0.08em; }
+.brandName { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: 0.08em; text-shadow: 0 0 12px rgba(88, 166, 255, 0.4); }
 .brandSub { font-size: 11px; color: var(--muted); }
 
 .statusRow { display: flex; gap: 20px; flex: 1; justify-content: center; }
 .statusStat { display: flex; flex-direction: column; align-items: center; }
 .statLabel { font-size: 9px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
-.statValue { font-size: 14px; font-weight: 600; color: var(--text); }
+.statValue { font-size: 14px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 
 /* ── BANNERS ── */
 .shadowBanner {
@@ -49,6 +50,15 @@
   padding: 5px;
   letter-spacing: 0.05em;
   font-weight: 600;
+}
+.marketBanner {
+  background: #161b2e;
+  border-bottom: 1px solid var(--purple);
+  color: var(--purple);
+  font-size: 11px;
+  text-align: center;
+  padding: 5px;
+  letter-spacing: 0.05em;
 }
 
 /* ── MAIN GRID ── */
@@ -103,15 +113,18 @@
   color: var(--accent);
   border-bottom-color: var(--accent);
   background: var(--surface);
+  box-shadow: inset 0 -8px 16px -8px rgba(88, 166, 255, 0.25);
 }
 
 /* ── SHARED CARD ── */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
+  transition: border-color .2s;
 }
+.card:hover { border-color: var(--surface3); }
 .cardHeader {
   padding: 10px 14px;
   font-size: 10px;

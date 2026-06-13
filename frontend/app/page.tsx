@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { EquityChart } from "./components/EquityChart";
+import { TradeStats } from "./components/TradeStats";
 import { DecisionFeed } from "./components/DecisionFeed";
 import { SignalFeed } from "./components/SignalFeed";
 import { TradeHistory } from "./components/TradeHistory";
@@ -83,6 +84,13 @@ export default function Dashboard() {
         <KillSwitch tripped={risk?.kill_switch_tripped} onTrip={mutateRisk} />
       </header>
 
+      {/* ── MARKET CLOSED BANNER ── */}
+      {risk?.market && !risk.market.open && (
+        <div className={styles.marketBanner}>
+          <span>🌙 {risk.market.note}</span>
+        </div>
+      )}
+
       {/* ── SHADOW MODE BANNER ── */}
       {risk?.shadow_mode && !risk.kill_switch_tripped && (
         <div className={styles.shadowBanner}>
@@ -107,6 +115,7 @@ export default function Dashboard() {
             <div className={styles.cardHeader}>Equity Curve</div>
             <EquityChart trades={trades} currentEquity={risk?.equity} />
           </section>
+          <TradeStats trades={trades} />
           <NewsPanel news={news} />
           <MetricsPanel metrics={metrics} />
         </div>

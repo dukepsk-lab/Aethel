@@ -1,6 +1,8 @@
 .wrap {
   position: relative;
-  height: 200px;
+  height: 220px;
+  width: 100%;
+  overflow: hidden;
   background: var(--surface);
 }
 .chart { width: 100%; height: 100%; }
@@ -14,4 +16,8 @@
   font-size: 11px;
   pointer-events: none;
   z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .wrap { height: 180px; }
 }

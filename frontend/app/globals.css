@@ -25,6 +25,7 @@ body {
   color: var(--text);
   font-size: 13px;
   line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
