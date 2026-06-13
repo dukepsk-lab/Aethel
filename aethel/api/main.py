@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
 from aethel.config import SYMBOL_SPECS, SYMBOLS, get_settings
+from aethel.core.market_hours import market_status
 from aethel.db.models import ClosedTrade, Decision
 from aethel.db.risk_state import RiskStateStore
 from aethel.db.session import get_sessionmaker, init_db
@@ -205,6 +206,7 @@ async def risk_status():
             "kill_switch_tripped": await store.is_tripped(),
             "shadow_mode": get_settings().shadow_mode,
             "open_positions": account.open_positions,
+            "market": market_status(),
         }
 
 
