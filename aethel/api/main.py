@@ -47,9 +47,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Aethel Command Center", version="0.1.0", lifespan=lifespan)
 
+_cors_origins = get_settings().cors_origins or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_cors_origins,
+    allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -212,3 +214,11 @@ async def manual_kill_switch():
         await store.trip_kill_switch("manual trip from Aethel Command Center")
     await send_alert("🛑 Kill switch tripped MANUALLY from Aethel Command Center")
     return {"kill_switch_tripped": True}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    s = get_settings()
+    uvicorn.run("aethel.api.main:app", host=s.api_host, port=s.api_port,
+                reload=False, log_level="info")

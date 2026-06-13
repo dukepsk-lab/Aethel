@@ -85,6 +85,13 @@ class Settings(BaseSettings):
     breakeven_trigger_rr: float = 1.0     # move SL to BE at 1R profit
     trailing_start_rr: float = 1.5
 
+    # API server
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    # CORS origins for the frontend — "*" to allow any (e.g. mobile access via VPS IP).
+    # Set to a comma-separated list to restrict, e.g. "http://1.2.3.4:3000"
+    cors_origins: list[str] = ["*"]
+
     # Alerts
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
