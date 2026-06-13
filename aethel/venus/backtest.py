@@ -38,6 +38,7 @@ def run_backtest(
     slippage: float = 0.00005,    # ~0.5 pip
     epochs: int = 10,
     n_splits: int = 5,
+    init_cash: float = 10_000,
 ) -> dict:
     print("[backtest] loading torch...", flush=True)
     import torch
@@ -136,7 +137,7 @@ def run_backtest(
         tp_stop=tp_frac.to_numpy(),
         fees=fees,
         slippage=slippage,
-        init_cash=10_000,
+        init_cash=init_cash,
         size=1.0,
         size_type="percent",  # full notional per trade; risk scaling is live-side
         freq="15min",
@@ -166,7 +167,8 @@ if __name__ == "__main__":
     p.add_argument("--data", required=True, type=Path)
     p.add_argument("--threshold", type=float, default=0.65)
     p.add_argument("--epochs", type=int, default=10)
+    p.add_argument("--balance", type=float, default=10_000, help="Starting balance (default 10000)")
     args = p.parse_args()
     m5 = pd.read_parquet(args.data)
-    report = run_backtest(m5, threshold=args.threshold, epochs=args.epochs)
+    report = run_backtest(m5, threshold=args.threshold, epochs=args.epochs, init_cash=args.balance)
     print(json.dumps({"symbol": args.symbol, **report}, indent=2))
