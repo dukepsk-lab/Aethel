@@ -12,7 +12,7 @@ There is no retry-into-execution and no default approval.
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import structlog
@@ -46,6 +46,17 @@ from aethel.venus.inference import VenusInference
 
 log = structlog.get_logger("orchestrator")
 
+
+def _market_is_open() -> bool:
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
+    wd = now.weekday()  # 0=Mon, 5=Sat, 6=Sun
+    if wd == 5:  # Saturday
+        return False
+    if wd == 6 and now.hour < 22:  # Sunday before 22:00 UTC
+        return False
+    return True
+
 # enough history for feature warm-up (fracdiff/ATR percentile ~500 bars) + model window
 CANDLE_COUNTS = {Timeframe.M5: 700, Timeframe.M15: 700, Timeframe.H1: 600}
 
@@ -65,6 +76,7 @@ class Orchestrator:
         self.risk_gate = RiskGate(self.news)
         self.hermes = Hermes(mt5)
         self.trade_manager = TradeManager(mt5)
+        self._market_was_open: bool = True
         self.venus: dict[str, VenusInference] = {}
         for symbol in SYMBOLS:
             try:
@@ -78,6 +90,16 @@ class Orchestrator:
         asyncio.create_task(self._weekly_audit_loop())
         try:
             while True:
+                is_open = _market_is_open()
+                if self._market_was_open and not is_open:
+                    await send_alert("🔒 Market closed — Aethel paused until Sunday 22:00 UTC")
+                elif not self._market_was_open and is_open:
+                    await send_alert("🔓 Market open — Aethel resuming")
+                self._market_was_open = is_open
+                if not is_open:
+                    log.info("market_closed_sleeping", next_check_min=30)
+                    await asyncio.sleep(1800)  # check again in 30 min
+                    continue
                 for symbol in self.venus:
                     try:
                         await self.process_symbol(symbol)

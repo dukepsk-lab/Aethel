@@ -13,6 +13,8 @@ import { AgentDebate } from "./components/AgentDebate";
 import { MetricsPanel } from "./components/MetricsPanel";
 import { SymbolCards } from "./components/SymbolCards";
 import { KillSwitch } from "./components/KillSwitch";
+import { PipelineHealth } from "./components/PipelineHealth";
+import { AgentPipeline } from "./components/AgentPipeline";
 import { API, fetcher } from "./lib/api";
 import styles from "./page.module.css";
 
@@ -98,6 +100,7 @@ export default function Dashboard() {
 
         {/* LEFT COLUMN */}
         <div className={styles.leftCol}>
+          <AgentPipeline metrics={metrics} decisions={decisions} />
           <SymbolCards decisions={decisions} />
           <OpenPositions positions={positions} />
           <section className={styles.card}>
@@ -110,6 +113,7 @@ export default function Dashboard() {
 
         {/* RIGHT COLUMN */}
         <div className={styles.rightCol}>
+          <PipelineHealth metrics={metrics} trades={trades} />
           <div className={styles.tabs}>
             {([
               ["decisions", `Decisions${decisions?.length ? ` (${decisions.length})` : ""}`],
