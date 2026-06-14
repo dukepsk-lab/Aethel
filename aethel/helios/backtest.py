@@ -16,6 +16,7 @@ from aethel.venus.features import FEATURE_COLUMNS
 from aethel.venus.labeling import ewm_volatility
 from aethel.venus.train import SEQ
 from aethel.venus.validation import PurgedWalkForward
+from aethel.venus.report import print_mt5_report, plot_equity_curve
 from aethel.helios.train import build_helios_dataset
 
 
@@ -32,6 +33,7 @@ def run_backtest(
     init_cash: float = 10_000,
     model_dir: Path | None = None,
     size: float = 1.0,
+    plot_dir: Path | None = None,
 ) -> dict:
     print("[helios-backtest] loading torch...", flush=True)
     import torch
@@ -193,21 +195,11 @@ def run_backtest(
     )
 
     trades = pf.trades
-    stats = {
-        "threshold": threshold,
-        "mode": "pretrained" if pretrained_model else f"trained_{epochs}ep",
-        "oos_samples": int(conf.notna().sum()),
-        "fold_aucs": fold_aucs,
-        "total_trades": int(trades.count()),
-        "win_rate": round(float(trades.win_rate()), 3) if trades.count() else None,
-        "profit_factor": round(float(trades.profit_factor()), 2) if trades.count() else None,
-        "total_return_pct": round(float(pf.total_return()) * 100, 2),
-        "sharpe": round(float(pf.sharpe_ratio()), 2),
-        "max_drawdown_pct": round(float(pf.max_drawdown()) * 100, 2),
-        "avg_trade_return_pct": (
-            round(float(trades.returns.mean()) * 100, 3) if trades.count() else None
-        ),
-    }
+    model_tag = "helios-pretrained" if pretrained_model else f"helios-trained_{epochs}ep"
+    stats = print_mt5_report(symbol, pf, trades, fold_aucs, threshold, init_cash, model_tag)
+    if plot_dir is not None:
+        out_png = Path(plot_dir) / f"{symbol}_helios_equity.png"
+        plot_equity_curve(symbol, pf, trades, out_png, init_cash, threshold, model_tag)
     return stats
 
 
@@ -220,6 +212,9 @@ if __name__ == "__main__":
     p.add_argument("--balance", type=float, default=10_000)
     p.add_argument("--size", type=float, default=1.0)
     p.add_argument("--model-dir", type=Path, default=None)
+    p.add_argument("--plot-dir", type=Path, default=Path("results"),
+                   help="Directory to save equity curve PNG (default: results/)")
+    p.add_argument("--no-plot", action="store_true", help="Skip equity curve generation")
     args = p.parse_args()
     m5 = pd.read_parquet(args.data)
     report = run_backtest(
@@ -230,5 +225,6 @@ if __name__ == "__main__":
         init_cash=args.balance,
         model_dir=args.model_dir,
         size=args.size,
+        plot_dir=None if args.no_plot else args.plot_dir,
     )
-    print(json.dumps({"symbol": args.symbol, **report}, indent=2))
+    print(json.dumps(report, indent=2))
