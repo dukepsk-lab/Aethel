@@ -123,8 +123,15 @@ def run_backtest(
     conf_full = conf.reindex(close.index)
     direction = meta["direction"].reindex(close.index)
     take = conf_full >= threshold
+
+    # diagnostics
+    print(f"\n[signals] conf non-nan: {conf.notna().sum()} | conf_full non-nan: {conf_full.notna().sum()}", flush=True)
+    print(f"[signals] conf range: {conf.dropna().min():.4f} – {conf.dropna().max():.4f}" if conf.notna().any() else "[signals] conf all NaN", flush=True)
+    print(f"[signals] take=True: {take.sum()} | direction>0: {(direction>0).sum()} | direction<0: {(direction<0).sum()}", flush=True)
+
     entries = (take & (direction > 0)).fillna(False)
     short_entries = (take & (direction < 0)).fillna(False)
+    print(f"[signals] entries: {entries.sum()} | short_entries: {short_entries.sum()}", flush=True)
 
     sl_frac = (sl_mult * vol / close).clip(lower=1e-5)
     tp_frac = (tp_mult * vol / close).clip(lower=1e-5)
