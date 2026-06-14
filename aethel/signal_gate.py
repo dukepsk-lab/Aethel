@@ -41,6 +41,14 @@ class SignalGate:
 
         return True, "ok"
 
+    def get_tier(self, signal: VenusSignal) -> str:
+        """Returns 'noise', 'normal', or 'high_conf'."""
+        if signal.confidence < self.s.venus_confidence_threshold:
+            return "noise"
+        if signal.confidence >= self.s.high_confidence_threshold:
+            return "high_conf"
+        return "normal"
+
     def record_consultation(self, symbol: str) -> None:
         now = utcnow()
         self._last_consult[symbol] = now

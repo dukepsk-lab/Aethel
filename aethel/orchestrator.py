@@ -15,6 +15,7 @@ import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import structlog
 
 from aethel.agents.apollo import Apollo
@@ -26,7 +27,7 @@ from aethel.agents.themis import Themis
 from aethel.config import SYMBOLS, get_settings
 from aethel.core.lifecycle import TradeState
 from aethel.core.regime import classify_regime
-from aethel.core.schemas import RiskRejection, Timeframe, Verdict, utcnow
+from aethel.core.schemas import Action, AresProposal, AthenaDecision, RiskRejection, Timeframe, Verdict, utcnow
 from aethel.db.memory import MemoryStore
 from aethel.db.models import Decision
 from aethel.db.risk_state import RiskStateStore
@@ -141,6 +142,8 @@ class Orchestrator:
             f"📡 Signal | {symbol} | {signal.direction.value} | conf={signal.confidence:.2f} | entering agent review"
         )
 
+        tier = self.signal_gate.get_tier(signal)
+
         # advisory context — failure here must never block the pipeline
         try:
             regime = classify_regime(candles[Timeframe.H1]).model_dump()
@@ -165,52 +168,110 @@ class Orchestrator:
                 metrics.incr("kill_switch_blocks")
                 return
 
-            # 3. Ares proposes
-            try:
-                with metrics.time_stage("ares"):
+            if tier == "high_conf":
+                # HIGH_CONF fast path — skip Ares and Athena, ATR-based SL/TP
+                log.info("high_conf_fast_path", symbol=symbol, confidence=signal.confidence)
+                await send_alert(
+                    f"⚡ HIGH CONF {signal.direction.value} {symbol} conf={signal.confidence:.2f} — fast path, boosted lots"
+                )
+                metrics.incr("high_conf_trades")
+                try:
                     tick = await self.mt5.get_tick(symbol)
-                    notes = await memory.recall(
-                        symbol, " ".join(f"{k}={v}" for k, v in signal.features.items()),
-                        regime=regime["label"] if regime else None)
-                    proposal = await self.ares.propose(
-                        signal, candles[Timeframe.M15], tick, notes, regime)
-            except (LLMUnavailable, ValueError) as e:
-                log.warning("ares_failed_no_trade", symbol=symbol, error=str(e))
-                metrics.incr("ares_failures")
-                return  # fail closed
+                    entry = tick.ask if signal.direction == Action.BUY else tick.bid
+                    h1_candles = candles[Timeframe.H1]
+                    highs = [c.high for c in h1_candles[-20:]]
+                    lows = [c.low for c in h1_candles[-20:]]
+                    atr = float(np.mean([h - l for h, l in zip(highs, lows)]))
+                    sl_dist = 2.0 * atr
+                    tp_dist = 4.0 * atr
+                    if signal.direction == Action.BUY:
+                        stop_loss = entry - sl_dist
+                        take_profit = entry + tp_dist
+                    else:
+                        stop_loss = entry + sl_dist
+                        take_profit = entry - tp_dist
+                    risk_pct = min(
+                        self.s.base_risk_pct * self.s.high_confidence_lot_multiplier,
+                        self.s.max_risk_pct_high_conf,
+                    )
+                    proposal = AresProposal(
+                        symbol=symbol,
+                        action=signal.direction,
+                        entry=round(entry, 5),
+                        stop_loss=round(stop_loss, 5),
+                        take_profit=round(take_profit, 5),
+                        risk_pct=risk_pct,
+                        rationale=f"high-confidence fast path (conf={signal.confidence:.2f})",
+                    )
+                except Exception as e:
+                    log.warning("high_conf_fast_path_failed_fallback_normal",
+                                symbol=symbol, error=str(e))
+                    tier = "normal"
 
-            # 4. Apollo sentiment (fail-soft, hourly-cached), then Athena reviews
-            with metrics.time_stage("apollo"):
-                brief = await self.apollo.brief(list(self.venus))
-            try:
-                with metrics.time_stage("athena"):
-                    events = await self.news.upcoming_for_symbol(symbol)
-                    decision = await self.athena.review(
-                        signal, proposal, account, positions, daily_pnl,
-                        [e.model_dump(mode="json") for e in events],
-                        regime, brief.model_dump() if brief else None)
-            except LLMUnavailable as e:
-                log.warning("athena_failed_no_trade", symbol=symbol, error=str(e))
-                metrics.incr("athena_failures")
-                return  # fail closed — Athena unreachable means NO trade
+                if tier == "high_conf":
+                    decision = AthenaDecision(
+                        verdict=Verdict.APPROVE,
+                        proposal=proposal,
+                        athena_rationale="high-confidence fast path — Athena bypassed",
+                        venus_confidence=signal.confidence,
+                        expires_at=utcnow() + timedelta(seconds=self.s.decision_ttl_seconds),
+                    )
+                    record = Decision(
+                        decision_id=decision.decision_id, symbol=symbol,
+                        state=TradeState.APPROVED, venus_signal=signal.model_dump(mode="json"),
+                        ares_proposal=proposal.model_dump(mode="json"),
+                        athena_decision={"verdict": "FAST_PATH", "veto_reason": None},
+                        created_at=utcnow(), updated_at=utcnow(),
+                    )
+                    session.add(record)
 
-            record = Decision(
-                decision_id=decision.decision_id, symbol=symbol,
-                state=TradeState.PROPOSED, venus_signal=signal.model_dump(mode="json"),
-                ares_proposal=proposal.model_dump(mode="json"),
-                athena_decision=decision.model_dump(mode="json"),
-                created_at=utcnow(), updated_at=utcnow(),
-            )
-            session.add(record)
+            if tier == "normal":
+                # 3. Ares proposes
+                try:
+                    with metrics.time_stage("ares"):
+                        tick = await self.mt5.get_tick(symbol)
+                        notes = await memory.recall(
+                            symbol, " ".join(f"{k}={v}" for k, v in signal.features.items()),
+                            regime=regime["label"] if regime else None)
+                        proposal = await self.ares.propose(
+                            signal, candles[Timeframe.M15], tick, notes, regime)
+                except (LLMUnavailable, ValueError) as e:
+                    log.warning("ares_failed_no_trade", symbol=symbol, error=str(e))
+                    metrics.incr("ares_failures")
+                    return  # fail closed
 
-            if decision.verdict == Verdict.VETO:
-                record.state = TradeState.VETOED
-                metrics.incr("athena_veto")
-                log.info("athena_veto", symbol=symbol, reason=decision.veto_reason)
-                await session.commit()
-                return
-            metrics.incr("athena_approve")
-            record.state = TradeState.APPROVED
+                # 4. Apollo sentiment (fail-soft, hourly-cached), then Athena reviews
+                with metrics.time_stage("apollo"):
+                    brief = await self.apollo.brief(list(self.venus))
+                try:
+                    with metrics.time_stage("athena"):
+                        events = await self.news.upcoming_for_symbol(symbol)
+                        decision = await self.athena.review(
+                            signal, proposal, account, positions, daily_pnl,
+                            [e.model_dump(mode="json") for e in events],
+                            regime, brief.model_dump() if brief else None)
+                except LLMUnavailable as e:
+                    log.warning("athena_failed_no_trade", symbol=symbol, error=str(e))
+                    metrics.incr("athena_failures")
+                    return  # fail closed — Athena unreachable means NO trade
+
+                record = Decision(
+                    decision_id=decision.decision_id, symbol=symbol,
+                    state=TradeState.PROPOSED, venus_signal=signal.model_dump(mode="json"),
+                    ares_proposal=proposal.model_dump(mode="json"),
+                    athena_decision=decision.model_dump(mode="json"),
+                    created_at=utcnow(), updated_at=utcnow(),
+                )
+                session.add(record)
+
+                if decision.verdict == Verdict.VETO:
+                    record.state = TradeState.VETOED
+                    metrics.incr("athena_veto")
+                    log.info("athena_veto", symbol=symbol, reason=decision.veto_reason)
+                    await session.commit()
+                    return
+                metrics.incr("athena_approve")
+                record.state = TradeState.APPROVED
 
             # 5. Risk Gate — fresh tick, hard limits
             with metrics.time_stage("risk_gate"):
