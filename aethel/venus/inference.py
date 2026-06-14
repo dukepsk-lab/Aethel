@@ -40,6 +40,7 @@ class VenusInference:
         torch = self._torch
         batch = {}
         latest_features: dict[str, float] = {}
+        h1_dist_ema50 = 0.0
         for tf, seq_len in SEQ_LEN.items():
             df = pd.DataFrame([c.model_dump() for c in candles[tf]]).set_index("time")
             feats = compute_features(df).ffill().fillna(0.0).tail(seq_len)
@@ -50,15 +51,18 @@ class VenusInference:
             )
             if tf == Timeframe.M15:
                 latest_features = feats.iloc[-1].to_dict()
+            if tf == Timeframe.H1:
+                h1_dist_ema50 = float(feats["dist_ema50"].iloc[-1])
 
         with torch.no_grad():
             logit = self.model(batch).item()
         raw = 1 / (1 + np.exp(-logit))
         confidence = float(self.calibrator.transform(np.array([raw]))[0])
 
-        # Direction from H1 trend context; confidence gates whether the
+        # Direction from H1 EMA-50 trend — must match training, where the label's
+        # trade direction is sign(H1 dist_ema50). Confidence gates whether the
         # setup is worth taking in that direction.
-        direction = Action.BUY if latest_features.get("dist_ema50", 0) >= 0 else Action.SELL
+        direction = Action.BUY if h1_dist_ema50 >= 0 else Action.SELL
         return VenusSignal(
             symbol=self.symbol,
             direction=direction,
