@@ -34,14 +34,17 @@ def print_mt5_report(
     net_pct       = float(pf.total_return()) * 100
     gross_profit  = float(trades.pnl.values[trades.pnl.values > 0].sum()) if n else 0.0
     gross_loss    = float(trades.pnl.values[trades.pnl.values < 0].sum()) if n else 0.0
-    profit_factor = abs(gross_profit / gross_loss) if gross_loss != 0 else float("inf")
+    profit_factor = (abs(gross_profit / gross_loss) if gross_loss != 0
+                     else (float("inf") if gross_profit > 0 else 0.0))
     win_rate      = float(trades.win_rate()) * 100 if n else 0.0
     max_dd        = float(pf.max_drawdown()) * 100
     sharpe        = float(pf.sharpe_ratio()) if n else 0.0
-    avg_win       = float(trades.pnl.values[trades.pnl.values > 0].mean()) if n else 0.0
-    avg_loss      = float(trades.pnl.values[trades.pnl.values < 0].mean()) if n else 0.0
-    max_win       = float(trades.pnl.values.max()) if n else 0.0
-    max_loss      = float(trades.pnl.values.min()) if n else 0.0
+    winning = trades.pnl.values[trades.pnl.values > 0] if n else np.array([])
+    losing  = trades.pnl.values[trades.pnl.values < 0] if n else np.array([])
+    avg_win  = float(winning.mean()) if len(winning) else 0.0
+    avg_loss = float(losing.mean())  if len(losing)  else 0.0
+    max_win  = float(winning.max())  if len(winning) else 0.0
+    max_loss = float(losing.min())   if len(losing)  else 0.0
     avg_ret_pct   = float(trades.returns.mean()) * 100 if n else 0.0
     expected_pay  = net_profit / n if n else 0.0
 
