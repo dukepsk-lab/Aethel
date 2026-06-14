@@ -202,8 +202,8 @@ def run_backtest(
         fees=fees,
         slippage=slippage,
         init_cash=init_cash,
-        size=size,
-        size_type="percent",
+        size=init_cash * size,
+        size_type="value",
         freq="15min",
     )
 
