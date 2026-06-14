@@ -9,3 +9,4 @@ export { TradeHistory } from "./TradeHistory";
 export { OpenPositions } from "./OpenPositions";
 export { ShadowTrades } from "./ShadowTrades";
 export { NewsPanel } from "./NewsPanel";
+export { ModelStatus } from "./ModelStatus";

@@ -79,6 +79,33 @@ async def retrain_status():
     return get_registry()
 
 
+@app.get("/models/status")
+async def models_status():
+    """Which Venus/Helios models are loaded and their versions."""
+    s = get_settings()
+    venus_dir = Path(s.retrain_artifacts_dir)
+    helios_dir = Path(s.helios_artifacts_dir)
+
+    def _artifact_info(base_dir: Path, symbol: str) -> dict:
+        sym_dir = base_dir / symbol
+        version_file = sym_dir / "version.txt"
+        model_file = sym_dir / "model.pt"
+        cal_file = sym_dir / "calibrator.pkl"
+        loaded = model_file.exists() and cal_file.exists()
+        version = version_file.read_text().strip() if version_file.exists() else None
+        return {"loaded": loaded, "version": version}
+
+    result = {}
+    for sym in SYMBOLS:
+        venus_info = _artifact_info(venus_dir, sym)
+        helios_info = _artifact_info(helios_dir, sym)
+        result[sym] = {
+            "venus": venus_info,
+            "helios": helios_info,
+        }
+    return result
+
+
 @app.get("/signals")
 async def signals(limit: int = 100):
     """Every Venus signal evaluation — including gate-blocked ones with the

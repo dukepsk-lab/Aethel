@@ -13,6 +13,7 @@ import { NewsPanel } from "./components/NewsPanel";
 import { AgentDebate } from "./components/AgentDebate";
 import { MetricsPanel } from "./components/MetricsPanel";
 import { SymbolCards } from "./components/SymbolCards";
+import { ModelStatus } from "./components/ModelStatus";
 import { KillSwitch } from "./components/KillSwitch";
 import { PipelineHealth } from "./components/PipelineHealth";
 import { AgentPipeline } from "./components/AgentPipeline";
@@ -48,6 +49,9 @@ export default function Dashboard() {
   );
   const { data: news } = useSWR(
     `${API}/news`, fetcher, { refreshInterval: 60000 }
+  );
+  const { data: modelStatus } = useSWR(
+    `${API}/models/status`, fetcher, { refreshInterval: 60000 }
   );
 
   const selectedDecision = decisions?.find((d: any) => d.decision_id === selectedDecisionId);
@@ -110,6 +114,7 @@ export default function Dashboard() {
         <div className={styles.leftCol}>
           <AgentPipeline metrics={metrics} decisions={decisions} />
           <SymbolCards decisions={decisions} />
+          <ModelStatus data={modelStatus} />
           <OpenPositions positions={positions} />
           <section className={styles.card}>
             <div className={styles.cardHeader}>Equity Curve</div>
