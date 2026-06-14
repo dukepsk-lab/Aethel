@@ -91,7 +91,9 @@ def main() -> None:
     ap.add_argument("--train",   action="store_true",
                     help="Run Venus training immediately after fetching")
     ap.add_argument("--helios", action="store_true",
-                    help="Also train Helios selective model after fetching")
+                    help="Also train Helios selective model (use with --train, or alone as --helios-only)")
+    ap.add_argument("--helios-only", action="store_true",
+                    help="Train only Helios (skip Venus training). Data must already exist in --out.")
     ap.add_argument("--epochs",  type=int,  default=15,
                     help="Training epochs per symbol (default 15, used with --train)")
     args = ap.parse_args()
@@ -116,6 +118,18 @@ def main() -> None:
     mt5.shutdown()
     print(f"\n{'─'*55}")
     print(f"Fetched {len(fetched)}/{len(args.symbols)} symbols → {args.out}/")
+
+    if args.helios_only:
+        print(f"\nStarting Helios-only training (epochs={args.epochs}) …\n")
+        from aethel.helios.train import train as helios_train
+        for sym, path in fetched:
+            print(f"{'─'*55}\n🔭  Training Helios {sym} …")
+            try:
+                helios_train(sym, path, Path("models/artifacts_helios"), epochs=args.epochs)
+            except Exception as e:
+                print(f"  ❌  {sym} Helios training failed: {e}")
+        print("\n✅  Helios done. Artifacts saved to models/artifacts_helios/")
+        return
 
     if not args.train:
         print("\nNext step — backtest each symbol:")
