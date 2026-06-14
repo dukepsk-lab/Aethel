@@ -25,6 +25,47 @@ from aethel.venus.validation import PurgedWalkForward
 SEQ = {"M5": 120, "M15": 96, "H1": 72}
 
 
+def resample_frames(m5: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Build M5/M15/H1 OHLCV frames from M5 input.
+
+    H1 is labeled with ``label="right"`` so each bar carries the timestamp of its
+    CLOSE, not its open. This is critical to avoid lookahead: ``df.loc[:ts]`` then
+    returns only H1 bars that have fully closed at or before ``ts``. With the
+    pandas default (``label="left"``) the in-progress H1 bar — whose high/low/close
+    encode prices up to an hour in the future — would be selected at the M15 entry
+    bar, leaking the future into both the H1 features and the H1-derived trade
+    direction (``sign(dist_ema50)``).
+
+    M15 keeps the default left label (the entry bar's own close IS the execution
+    price, known at entry) and M5 stays native; with M15 timestamps on the bar
+    open, ``loc[:ts]`` on left-labeled M5/M15 never reaches past the entry bar.
+    """
+    return {
+        "M5": m5,
+        "M15": m5.resample("15min").agg(
+            {"open": "first", "high": "max", "low": "min",
+             "close": "last", "tick_volume": "sum"}).dropna(),
+        "H1": m5.resample("1h", label="right", closed="left").agg(
+            {"open": "first", "high": "max", "low": "min",
+             "close": "last", "tick_volume": "sum"}).dropna(),
+    }
+
+
+def remap_t_end_to_samples(t_end_frame: np.ndarray, frame_index: pd.DatetimeIndex,
+                           sample_times: list) -> np.ndarray:
+    """Convert barrier-touch positions from frame coordinates to sample-array
+    coordinates so PurgedWalkForward purges correctly.
+
+    ``triple_barrier_labels`` records ``t_end`` as an integer row position within
+    the M15 frame. But the dataset keeps only a SUBSET of those rows as samples
+    (Helios keeps ~30%), so a frame position is not comparable to a sample index.
+    We map each barrier-touch *time* to the first sample at or after it.
+    """
+    sample_idx = pd.DatetimeIndex(sample_times)
+    barrier_times = frame_index[t_end_frame]
+    return np.searchsorted(sample_idx.values, barrier_times.values, side="left")
+
+
 def pick_device():
     """Prefer CUDA, then Apple MPS, else CPU. Printed once so the operator
     can confirm the GPU is actually being used."""
@@ -40,15 +81,7 @@ def pick_device():
 def build_dataset(m5: pd.DataFrame):
     import torch
 
-    frames = {
-        "M5": m5,
-        "M15": m5.resample("15min").agg(
-            {"open": "first", "high": "max", "low": "min",
-             "close": "last", "tick_volume": "sum"}).dropna(),
-        "H1": m5.resample("1h").agg(
-            {"open": "first", "high": "max", "low": "min",
-             "close": "last", "tick_volume": "sum"}).dropna(),
-    }
+    frames = resample_frames(m5)
     feats = {tf: compute_features(df).ffill().fillna(0.0) for tf, df in frames.items()}
 
     # Primary direction: H1 EMA-50 trend, sampled per M15 bar; label whether
@@ -80,7 +113,9 @@ def build_dataset(m5: pd.DataFrame):
     x = {tf: torch.tensor(np.stack([s[tf] for s in samples]), dtype=torch.float32)
          for tf in SEQ}
     meta = pd.DataFrame({"direction": dirs}, index=pd.DatetimeIndex(times))
-    return x, y, np.array(t_ends), meta
+    # remap barrier-touch positions from M15-frame coords to sample-array coords
+    t_end = remap_t_end_to_samples(np.array(t_ends), base.index, times)
+    return x, y, t_end, meta
 
 
 def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,

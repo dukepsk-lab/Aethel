@@ -14,7 +14,7 @@ import pandas as pd
 
 from aethel.venus.calibration import Calibrator
 from aethel.venus.features import FEATURE_COLUMNS, compute_features
-from aethel.venus.train import SEQ, pick_device
+from aethel.venus.train import SEQ, pick_device, resample_frames, remap_t_end_to_samples
 from aethel.venus.validation import PurgedWalkForward
 from aethel.helios.labeling import selective_labels
 
@@ -22,15 +22,7 @@ from aethel.helios.labeling import selective_labels
 def build_helios_dataset(m5: pd.DataFrame):
     import torch
 
-    frames = {
-        "M5": m5,
-        "M15": m5.resample("15min").agg(
-            {"open": "first", "high": "max", "low": "min",
-             "close": "last", "tick_volume": "sum"}).dropna(),
-        "H1": m5.resample("1h").agg(
-            {"open": "first", "high": "max", "low": "min",
-             "close": "last", "tick_volume": "sum"}).dropna(),
-    }
+    frames = resample_frames(m5)
     feats = {tf: compute_features(df).ffill().fillna(0.0) for tf, df in frames.items()}
 
     labels = selective_labels(
@@ -67,7 +59,9 @@ def build_helios_dataset(m5: pd.DataFrame):
     x = {tf: torch.tensor(np.stack([s[tf] for s in samples]), dtype=torch.float32)
          for tf in SEQ}
     meta = pd.DataFrame({"direction": dirs}, index=pd.DatetimeIndex(times))
-    return x, y, np.array(t_ends), meta
+    # remap barrier-touch positions from M15-frame coords to sample-array coords
+    t_end = remap_t_end_to_samples(np.array(t_ends), base.index, times)
+    return x, y, t_end, meta
 
 
 def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20) -> None:
