@@ -163,18 +163,37 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
     calibrator = Calibrator()
     calibrator.fit(np.concatenate(oof_raw), np.concatenate(oof_y))
 
-    # Final champion: retrain on all data, ship with the OOF-fit calibrator.
+    # Final champion: train on all data except a held-out calibration tail.
+    # We refit the calibrator on the held-out tail so the saved calibrator is
+    # consistent with the FINAL model's score distribution, not the fold models'.
+    # This fixes the isotonic cap issue (OOF fold models cap at ~base-rate because
+    # they see less data; the final model is more confident on the same bars).
+    CAL_FRAC = 0.15  # reserve last 15% chronologically for calibration
+    cal_start = int(n * (1 - CAL_FRAC))
+    train_idx = np.arange(cal_start)  # first 85%
+    cal_idx   = np.arange(cal_start, n)  # last 15%
+
     model = VenusNet(n_features=len(FEATURE_COLUMNS)).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     loss_fn = torch.nn.BCEWithLogitsLoss()
     for _ in range(epochs):
-        perm = np.random.permutation(n)
-        for i in range(0, n, batch_size):
+        perm = np.random.permutation(train_idx)
+        for i in range(0, len(perm), batch_size):
             idx = perm[i:i + batch_size]
             opt.zero_grad()
             loss = loss_fn(model(to_device(idx)), y[idx])
             loss.backward()
             opt.step()
+
+    model.eval()
+    with torch.no_grad():
+        cal_raw = torch.sigmoid(model(to_device(cal_idx))).cpu().numpy()
+    cal_y = y[cal_idx].cpu().numpy()
+    calibrator = Calibrator()
+    calibrator.fit(cal_raw, cal_y)
+    print(f"  calibrator refit on held-out tail ({len(cal_idx):,} samples)  "
+          f"conf range [{cal_raw.min():.3f}, {cal_raw.max():.3f}] "
+          f"-> [{calibrator.transform(cal_raw).min():.3f}, {calibrator.transform(cal_raw).max():.3f}]")
 
     sym_dir = out_dir / symbol
     sym_dir.mkdir(parents=True, exist_ok=True)

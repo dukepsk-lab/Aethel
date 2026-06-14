@@ -112,21 +112,34 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20) -> None
         print(f"[Helios] {symbol}: no folds completed")
         return
 
-    calibrator = Calibrator()
-    calibrator.fit(np.concatenate(oof_raw), np.concatenate(oof_y))
+    # Final model: train on first 85%, refit calibrator on last 15% held-out tail.
+    # This ensures the saved calibrator is consistent with the final model's score
+    # distribution (not the fold models'), fixing the isotonic cap at base-rate.
+    CAL_FRAC = 0.15
+    cal_start = int(n * (1 - CAL_FRAC))
+    train_idx = np.arange(cal_start)
+    cal_idx   = np.arange(cal_start, n)
 
-    # Final model on all data
     model = VenusNet(n_features=len(FEATURE_COLUMNS)).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     loss_fn = torch.nn.BCEWithLogitsLoss()
     for _ in range(epochs):
-        perm = np.random.permutation(n)
-        for i in range(0, n, 256):
+        perm = np.random.permutation(train_idx)
+        for i in range(0, len(perm), 256):
             idx = perm[i:i + 256]
             opt.zero_grad()
             loss = loss_fn(model(to_device(idx)), y[idx])
             loss.backward()
             opt.step()
+
+    model.eval()
+    with torch.no_grad():
+        cal_raw = torch.sigmoid(model(to_device(cal_idx))).cpu().numpy()
+    cal_y = y[cal_idx].cpu().numpy()
+    calibrator = Calibrator()
+    calibrator.fit(cal_raw, cal_y)
+    print(f"  [Helios] calibrator refit on tail ({len(cal_idx):,} samples)  "
+          f"conf max -> {calibrator.transform(cal_raw).max():.3f}")
 
     sym_dir = out_dir / symbol
     sym_dir.mkdir(parents=True, exist_ok=True)
