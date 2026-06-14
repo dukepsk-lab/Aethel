@@ -50,7 +50,6 @@ def run_backtest(
     print(f"[helios-backtest] device: {device}", flush=True)
 
     pretrained_model = None
-    pretrained_cal = None
     if model_dir is not None:
         sym_dir = Path(model_dir) / symbol
         print(f"[helios-backtest] loading pre-trained model from {sym_dir}...", flush=True)
@@ -59,8 +58,7 @@ def run_backtest(
             torch.load(sym_dir / "model.pt", map_location=device)
         )
         pretrained_model.to(device).eval()
-        pretrained_cal = Calibrator.load(sym_dir / "calibrator.pkl")
-        print("[helios-backtest] model loaded", flush=True)
+        print("[helios-backtest] model loaded (calibration done fold-by-fold)", flush=True)
 
     print("[helios-backtest] building Helios dataset...", flush=True)
     x, y, t_end, meta = build_helios_dataset(m5)
@@ -122,19 +120,17 @@ def run_backtest(
         except ValueError:
             fold_aucs.append(None)
 
-        if pretrained_cal is not None:
-            cal_conf = pretrained_cal.transform(raw)
-            conf.iloc[te] = cal_conf
-        elif prior_raw:
+        if prior_raw:
             cal = Calibrator()
             cal.fit(np.concatenate(prior_raw), np.concatenate(prior_y))
             cal_conf = cal.transform(raw)
             conf.iloc[te] = cal_conf
         else:
-            cal_conf = None
-        if cal_conf is not None:
-            all_conf.append(cal_conf)
-            all_labels.append(y_te)
+            # first fold — no prior data to calibrate, use raw sigmoid
+            conf.iloc[te] = raw
+            cal_conf = raw
+        all_conf.append(cal_conf)
+        all_labels.append(y_te)
         prior_raw.append(raw)
         prior_y.append(y_te)
 
