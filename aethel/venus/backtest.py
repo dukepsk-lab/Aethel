@@ -86,6 +86,8 @@ def run_backtest(
     vol = ewm_volatility(close, span=100)
 
     conf = pd.Series(np.nan, index=meta.index)
+    all_conf: list[np.ndarray] = []
+    all_labels: list[np.ndarray] = []
     prior_raw: list[np.ndarray] = []
     prior_y: list[np.ndarray] = []
     fold_aucs = []
@@ -136,13 +138,18 @@ def run_backtest(
             print("  OOF AUC=n/a", flush=True)
 
         if pretrained_cal is not None:
-            # use the deployed calibrator directly
-            conf.iloc[te] = pretrained_cal.transform(raw)
+            cal_conf = pretrained_cal.transform(raw)
+            conf.iloc[te] = cal_conf
         elif prior_raw:
-            # fit calibrator on prior folds only (leak-free)
             cal = Calibrator()
             cal.fit(np.concatenate(prior_raw), np.concatenate(prior_y))
-            conf.iloc[te] = cal.transform(raw)
+            cal_conf = cal.transform(raw)
+            conf.iloc[te] = cal_conf
+        else:
+            cal_conf = None
+        if cal_conf is not None:
+            all_conf.append(cal_conf)
+            all_labels.append(y_te)
         prior_raw.append(raw)
         prior_y.append(y_te)
 
@@ -153,6 +160,32 @@ def run_backtest(
 
     print(f"\n[signals] conf range: {conf.dropna().min():.4f} – {conf.dropna().max():.4f}" if conf.notna().any() else "[signals] conf all NaN", flush=True)
     print(f"[signals] take={take.sum()} entries={((take)&(direction>0)).sum()} short={(take&(direction<0)).sum()}", flush=True)
+
+    # --- confidence distribution analysis ---
+    if all_conf:
+        c_arr = np.concatenate(all_conf).ravel()
+        l_arr = np.concatenate(all_labels).ravel()
+        bins = np.arange(0.0, 1.05, 0.1)
+        print(f"\n{'─'*62}", flush=True)
+        print(f"{'Confidence':>12}  {'Count':>7}  {'% of OOS':>9}  {'Hit Rate':>9}  Bar", flush=True)
+        print(f"{'─'*62}", flush=True)
+        for lo, hi in zip(bins[:-1], bins[1:]):
+            mask = (c_arr >= lo) & (c_arr < hi)
+            cnt = mask.sum()
+            if cnt == 0:
+                continue
+            hit = l_arr[mask].mean()
+            pct = cnt / len(c_arr) * 100
+            bar_pos = int(hit * 20)
+            bar_neg = 20 - bar_pos
+            bar = f"{'█' * bar_pos}{'░' * bar_neg}"
+            marker = " ◀ threshold" if lo < threshold <= hi else ""
+            print(f"  {lo:.1f}–{hi:.1f}      {cnt:>7,}  {pct:>8.1f}%  {hit:>8.1%}  {bar}{marker}", flush=True)
+        print(f"{'─'*62}", flush=True)
+        total_above = (c_arr >= threshold).sum()
+        hit_above = l_arr[c_arr >= threshold].mean() if total_above else 0
+        print(f"  Above {threshold:.2f}   {total_above:>7,}  {'':>9}  {hit_above:>8.1%}  ← signals used", flush=True)
+        print(f"{'─'*62}\n", flush=True)
 
     entries = (take & (direction > 0)).fillna(False)
     short_entries = (take & (direction < 0)).fillna(False)
