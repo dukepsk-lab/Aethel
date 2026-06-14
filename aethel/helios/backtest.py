@@ -50,6 +50,7 @@ def run_backtest(
     print(f"[helios-backtest] device: {device}", flush=True)
 
     pretrained_model = None
+    pretrained_cal = None
     if model_dir is not None:
         sym_dir = Path(model_dir) / symbol
         print(f"[helios-backtest] loading pre-trained model from {sym_dir}...", flush=True)
@@ -58,7 +59,8 @@ def run_backtest(
             torch.load(sym_dir / "model.pt", map_location=device)
         )
         pretrained_model.to(device).eval()
-        print("[helios-backtest] model loaded (calibration done fold-by-fold)", flush=True)
+        pretrained_cal = Calibrator.load(sym_dir / "calibrator.pkl")
+        print("[helios-backtest] model + saved calibrator loaded (matches live)", flush=True)
 
     print("[helios-backtest] building Helios dataset...", flush=True)
     x, y, t_end, meta = build_helios_dataset(m5)
@@ -120,13 +122,18 @@ def run_backtest(
         except ValueError:
             fold_aucs.append(None)
 
-        if prior_raw:
+        if pretrained_cal is not None:
+            # use the SAVED calibrator — this is exactly what live inference uses,
+            # so backtest confidence (and the trades it gates) reflect live.
+            cal_conf = pretrained_cal.transform(raw)
+            conf.iloc[te] = cal_conf
+        elif prior_raw:
             cal = Calibrator()
             cal.fit(np.concatenate(prior_raw), np.concatenate(prior_y))
             cal_conf = cal.transform(raw)
             conf.iloc[te] = cal_conf
         else:
-            # first fold — no prior data to calibrate, use raw sigmoid
+            # first fold with no saved calibrator — fall back to raw sigmoid
             conf.iloc[te] = raw
             cal_conf = raw
         all_conf.append(cal_conf)
