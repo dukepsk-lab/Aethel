@@ -40,6 +40,8 @@ You may also receive an H1 market-regime label and a news-sentiment brief
 (from Apollo). Both are advisory context; either may be null/unavailable —
 their absence is NOT a reason to veto.
 
+model_consensus shows whether both Venus and Helios ML models agree. Disagreement is a signal of lower conviction and should increase scrutiny.
+
 You may APPROVE the proposal as-is or VETO it. You may NOT modify its levels.
 Approve only when you would defend this trade in a post-mortem.
 
@@ -80,6 +82,17 @@ class Athena:
             "upcoming_high_impact_events": upcoming_events,
             "h1_market_regime": regime,
             "news_sentiment": news_sentiment,  # Apollo's brief; null = unavailable
+            "model_consensus": {
+                "venus_confidence": signal.confidence,
+                "helios_confidence": signal.helios_confidence,
+                "consensus": signal.helios_agreed,
+                "note": (
+                    "Both Venus and Helios models agree on this signal." if signal.helios_agreed
+                    else "Venus signals but Helios does NOT agree — lower conviction setup."
+                    if signal.helios_agreed is False
+                    else "Helios model unavailable — single-model signal."
+                ),
+            },
         })
         raw = await self.llm.structured("athena", SYSTEM, user, _AthenaRaw)
         return AthenaDecision(

@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     signal_cooldown_seconds: int = 900    # per-symbol cooldown between consultations
     max_agent_calls_per_hour: int = 12
     high_confidence_threshold: float = 0.75   # bypass agents, scale up lots
+    helios_enabled: bool = True
+    helios_artifacts_dir: str = "models/artifacts_helios"
+    helios_confidence_threshold: float = 0.55
     high_confidence_lot_multiplier: float = 1.5  # multiply base risk_pct by this
     max_risk_pct_high_conf: float = 1.5       # hard cap on risk_pct for high-conf trades
     base_risk_pct: float = 0.5               # default risk_pct used in high-conf fast path

@@ -49,6 +49,17 @@ class Ares:
             "recent_m15": recent,
             "lessons_from_similar_past_trades": memory_notes,
             "h1_market_regime": regime,
+            "model_consensus": {
+                "venus_confidence": signal.confidence,
+                "helios_confidence": signal.helios_confidence,
+                "consensus": signal.helios_agreed,
+                "note": (
+                    "Both Venus and Helios models agree on this signal." if signal.helios_agreed
+                    else "Venus signals but Helios does NOT agree — lower conviction setup."
+                    if signal.helios_agreed is False
+                    else "Helios model unavailable — single-model signal."
+                ),
+            },
         })
         proposal = await self.llm.structured("deepseek", SYSTEM, user, AresProposal)
         if proposal.symbol != signal.symbol:

@@ -90,6 +90,8 @@ def main() -> None:
                     help="Output directory (default: data/)")
     ap.add_argument("--train",   action="store_true",
                     help="Run Venus training immediately after fetching")
+    ap.add_argument("--helios", action="store_true",
+                    help="Also train Helios selective model after fetching")
     ap.add_argument("--epochs",  type=int,  default=15,
                     help="Training epochs per symbol (default 15, used with --train)")
     args = ap.parse_args()
@@ -135,6 +137,17 @@ def main() -> None:
         except Exception as e:
             print(f"  ❌  {sym} training failed: {e}")
     print("\n✅  Done. Artifacts saved to models/artifacts/")
+
+    if args.helios:
+        print(f"\nStarting Helios training (selective labels, epochs={args.epochs}) …\n")
+        from aethel.helios.train import train as helios_train
+        for sym, path in fetched:
+            print(f"{'─'*55}\n🔭  Training Helios {sym} …")
+            try:
+                helios_train(sym, path, Path("models/artifacts_helios"), epochs=args.epochs)
+            except Exception as e:
+                print(f"  ❌  {sym} Helios training failed: {e}")
+        print("\n✅  Helios done. Artifacts saved to models/artifacts_helios/")
 
 
 if __name__ == "__main__":

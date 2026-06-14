@@ -84,6 +84,14 @@ class Orchestrator:
                 self.venus[symbol] = VenusInference(artifacts_dir, symbol)
             except FileNotFoundError:
                 log.warning("venus_artifact_missing", symbol=symbol)
+        self.helios: dict[str, VenusInference] = {}
+        if self.s.helios_enabled:
+            helios_dir = Path(self.s.helios_artifacts_dir)
+            for symbol in SYMBOLS:
+                try:
+                    self.helios[symbol] = VenusInference(helios_dir, symbol)
+                except FileNotFoundError:
+                    log.info("helios_artifact_missing", symbol=symbol)
 
     async def run_forever(self) -> None:
         log.info("aethel_started", shadow_mode=self.s.shadow_mode, symbols=SYMBOLS)
@@ -130,6 +138,23 @@ class Orchestrator:
             signal = self.venus[symbol].predict(candles)
         metrics.incr("venus_signals")
 
+        # Helios inference (fail-soft — missing model just means no consensus data)
+        helios_conf: float | None = None
+        helios_agreed: bool | None = None
+        if symbol in self.helios:
+            try:
+                h_signal = self.helios[symbol].predict(candles)
+                helios_conf = h_signal.confidence
+                helios_agreed = helios_conf >= self.s.helios_confidence_threshold
+            except Exception as e:
+                log.warning("helios_inference_failed", symbol=symbol, error=str(e))
+
+        # Annotate venus signal with helios info
+        signal = signal.model_copy(update={
+            "helios_confidence": helios_conf,
+            "helios_agreed": helios_agreed,
+        })
+
         # 2. Signal Gate
         consult, reason = self.signal_gate.should_consult_agents(signal)
         signal_log.record(signal, passed=consult, reason=reason)
@@ -138,8 +163,15 @@ class Orchestrator:
             metrics.incr("gate_blocked")
             return
         self.signal_gate.record_consultation(symbol)
+        consensus_str = ""
+        if helios_agreed is True:
+            consensus_str = " | ✅ Helios agrees"
+        elif helios_agreed is False:
+            consensus_str = " | ⚠️ Helios disagrees"
+        elif helios_agreed is None and self.s.helios_enabled:
+            consensus_str = " | ❓ Helios unavailable"
         await send_alert(
-            f"📡 Signal | {symbol} | {signal.direction.value} | conf={signal.confidence:.2f} | entering agent review"
+            f"📡 Signal | {symbol} | {signal.direction.value} | conf={signal.confidence:.2f}{consensus_str}"
         )
 
         tier = self.signal_gate.get_tier(signal)

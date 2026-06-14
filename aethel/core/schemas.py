@@ -84,6 +84,8 @@ class VenusSignal(BaseModel):
     features: dict[str, float] = Field(default_factory=dict)
     model_version: str
     generated_at: datetime = Field(default_factory=utcnow)
+    helios_confidence: float | None = None
+    helios_agreed: bool | None = None   # True=both agree, False=only Venus, None=Helios disabled/unavailable
 
 
 class AresProposal(BaseModel):
