@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     mt5_mode: Literal["gateway", "direct"] = "gateway"
     mt5_gateway_url: str = "http://localhost:8001"
     mt5_gateway_token: str = ""
+    mt5_path: str = ""   # optional: full path to terminal64.exe, e.g. C:/Program Files/MetaTrader 5/terminal64.exe
 
     # LLM APIs (strictly cloud)
     deepseek_api_key: str = ""

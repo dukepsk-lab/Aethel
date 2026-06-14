@@ -27,9 +27,14 @@ _TF_MAP = {"M5": 5, "M15": 15, "H1": 16385}  # MetaTrader5 timeframe constants
 class DirectMT5Client(MT5Client):
     def __init__(self) -> None:
         import MetaTrader5 as mt5  # Windows only
+        from aethel.config import get_settings
 
         self._mt5 = mt5
-        if not mt5.initialize():
+        s = get_settings()
+        kwargs = {}
+        if s.mt5_path:
+            kwargs["path"] = s.mt5_path
+        if not mt5.initialize(**kwargs):
             raise RuntimeError(f"MT5 initialize failed: {mt5.last_error()}")
 
     async def _run(self, fn, *args):
