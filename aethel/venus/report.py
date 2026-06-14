@@ -21,6 +21,8 @@ def print_mt5_report(
     threshold: float,
     init_cash: float,
     model_tag: str = "",
+    lots: float = 0.0,
+    lot_per_equity: float = 200.0,
 ) -> dict:
     """Print a Strategy Tester-style summary and return the stats dict."""
     n = int(trades.count())
@@ -75,6 +77,7 @@ def print_mt5_report(
     print(f"  STRATEGY TESTER REPORT  —  {symbol}  {model_tag}")
     print(f"{div2}")
     print(f"  Period       {start_dt} – {end_dt}")
+    print(f"  {'Position size':<28} {lots:.2f} lots  (0.01/${lot_per_equity:.0f} equity)")
     print(f"  OOF AUC      {auc_str}")
     print(f"  Threshold    {threshold:.2f}")
     print(div)
@@ -127,6 +130,8 @@ def print_mt5_report(
         "max_consec_losses": max_consec_loss,
         "max_drawdown_pct": round(max_dd, 2),
         "sharpe": round(sharpe, 2),
+        "lots": lots,
+        "lot_per_equity": lot_per_equity,
     }
 
 
@@ -138,6 +143,7 @@ def plot_equity_curve(
     init_cash: float = 10_000,
     threshold: float = 0.0,
     model_tag: str = "",
+    lots: float = 0.0,
 ) -> None:
     """Save an equity curve PNG with drawdown panel and trade markers."""
     try:
@@ -212,7 +218,7 @@ def plot_equity_curve(
     pf_val   = abs(float(trades.pnl.values[trades.pnl.values > 0].sum()) /
                    float(trades.pnl.values[trades.pnl.values < 0].sum())) if n and (trades.pnl.values < 0).any() else 0
 
-    title = (f"{symbol}  |  {model_tag}  |  threshold {threshold:.2f}  |  "
+    title = (f"{symbol}  |  {model_tag}  |  threshold {threshold:.2f}  |  {lots:.2f} lots  |  "
              f"{n} trades  |  WR {wr:.1f}%  |  PF {pf_val:.2f}  |  "
              f"Net {net_pnl:+,.0f} ({net_pct:+.1f}%)")
     ax1.set_title(title, color="#e6edf3", fontsize=10, pad=8)

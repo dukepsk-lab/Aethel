@@ -20,10 +20,21 @@ from aethel.venus.report import print_mt5_report, plot_equity_curve
 from aethel.helios.train import build_helios_dataset
 
 
+# Contract sizes: base units per standard lot
+_CONTRACT_UNITS = {"XAUUSD": 100}   # troy oz; all forex = 100_000
+
+
+def _position_value(symbol: str, lots: float, ref_price: float) -> float:
+    """Approximate USD notional for vectorbt size_type='value'."""
+    if symbol == "XAUUSD":
+        return lots * 100 * ref_price   # gold: 100 oz/lot * price
+    return lots * 100_000               # forex: 100k base units/lot (price ~1 so USD≈units)
+
+
 def run_backtest(
     m5: pd.DataFrame,
     symbol: str = "UNKNOWN",
-    threshold: float = 0.60,
+    threshold: float = 0.50,
     tp_mult: float = 2.0,
     sl_mult: float = 1.0,
     fees: float = 0.00002,
@@ -32,9 +43,16 @@ def run_backtest(
     n_splits: int = 5,
     init_cash: float = 10_000,
     model_dir: Path | None = None,
-    size: float = 1.0,
+    lot_per_equity: float = 200.0,
+    min_lot: float = 0.01,
+    max_lot: float = 10.0,
+    data_days: int | None = None,
     plot_dir: Path | None = None,
 ) -> dict:
+    if data_days is not None:
+        cutoff = m5.index[-1] - pd.Timedelta(days=data_days)
+        m5 = m5[m5.index >= cutoff]
+
     print("[helios-backtest] loading torch...", flush=True)
     import torch
     print("[helios-backtest] loading vectorbt...", flush=True)
@@ -180,6 +198,15 @@ def run_backtest(
     sl_frac = (sl_mult * vol / close).clip(lower=1e-5)
     tp_frac = (tp_mult * vol / close).clip(lower=1e-5)
 
+    # lot-based sizing
+    lots = float(np.clip(
+        np.floor(init_cash / lot_per_equity) * 0.01,
+        min_lot, max_lot,
+    ))
+    ref_price = float(close.dropna().iloc[0])
+    pos_value = _position_value(symbol, lots, ref_price)
+    print(f"[sizing] lots={lots:.2f}  ref_price={ref_price:.5f}  position_value=${pos_value:,.0f}", flush=True)
+
     pf = vbt.Portfolio.from_signals(
         close=close,
         entries=entries,
@@ -189,17 +216,18 @@ def run_backtest(
         fees=fees,
         slippage=slippage,
         init_cash=init_cash,
-        size=init_cash * size,
+        size=pos_value,
         size_type="value",
         freq="15min",
     )
 
     trades = pf.trades
     model_tag = "helios-pretrained" if pretrained_model else f"helios-trained_{epochs}ep"
-    stats = print_mt5_report(symbol, pf, trades, fold_aucs, threshold, init_cash, model_tag)
+    stats = print_mt5_report(symbol, pf, trades, fold_aucs, threshold, init_cash, model_tag,
+                             lots=lots, lot_per_equity=lot_per_equity)
     if plot_dir is not None:
         out_png = Path(plot_dir) / f"{symbol}_helios_equity.png"
-        plot_equity_curve(symbol, pf, trades, out_png, init_cash, threshold, model_tag)
+        plot_equity_curve(symbol, pf, trades, out_png, init_cash, threshold, model_tag, lots=lots)
     return stats
 
 
@@ -207,10 +235,14 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--symbol", required=True)
     p.add_argument("--data", required=True, type=Path)
-    p.add_argument("--threshold", type=float, default=0.60)
+    p.add_argument("--threshold", type=float, default=0.50)
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--balance", type=float, default=10_000)
-    p.add_argument("--size", type=float, default=1.0)
+    p.add_argument("--lot-per-equity", type=float, default=200.0)
+    p.add_argument("--min-lot", type=float, default=0.01)
+    p.add_argument("--max-lot", type=float, default=10.0)
+    p.add_argument("--data-days", type=int, default=None,
+                   help="Use only the last N calendar days of data (e.g. 365)")
     p.add_argument("--model-dir", type=Path, default=None)
     p.add_argument("--plot-dir", type=Path, default=Path("results"),
                    help="Directory to save equity curve PNG (default: results/)")
@@ -224,7 +256,10 @@ if __name__ == "__main__":
         epochs=args.epochs,
         init_cash=args.balance,
         model_dir=args.model_dir,
-        size=args.size,
+        lot_per_equity=args.lot_per_equity,
+        min_lot=args.min_lot,
+        max_lot=args.max_lot,
+        data_days=args.data_days,
         plot_dir=None if args.no_plot else args.plot_dir,
     )
     print(json.dumps(report, indent=2))
