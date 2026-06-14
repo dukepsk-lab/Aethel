@@ -160,8 +160,10 @@ def plot_equity_curve(
     # trade entry/exit times and P&L
     n = int(trades.count())
     if n:
-        entry_times = pd.DatetimeIndex(trades.entry_idx.map(lambda i: eq.index[int(i)]))
-        exit_times  = pd.DatetimeIndex(trades.exit_idx.map(lambda i: eq.index[min(int(i), len(eq)-1)]))
+        entry_idx = trades.entry_idx.values.astype(int)
+        exit_idx  = trades.exit_idx.values.astype(int)
+        entry_times = pd.DatetimeIndex([eq.index[i] for i in entry_idx])
+        exit_times  = pd.DatetimeIndex([eq.index[min(i, len(eq)-1)] for i in exit_idx])
         pnls        = trades.pnl.values
         win_mask    = pnls > 0
     else:
