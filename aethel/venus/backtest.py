@@ -40,6 +40,7 @@ def run_backtest(
     n_splits: int = 5,
     init_cash: float = 10_000,
     model_dir: Path | None = None,
+    size: float = 1.0,
 ) -> dict:
     print("[backtest] loading torch...", flush=True)
     import torch
@@ -168,7 +169,7 @@ def run_backtest(
         fees=fees,
         slippage=slippage,
         init_cash=init_cash,
-        size=1.0,
+        size=size,
         size_type="percent",
         freq="15min",
     )
@@ -200,6 +201,8 @@ if __name__ == "__main__":
     p.add_argument("--epochs", type=int, default=10,
                    help="Epochs per fold (ignored when --model-dir is given)")
     p.add_argument("--balance", type=float, default=10_000)
+    p.add_argument("--size", type=float, default=1.0,
+                   help="Position size as fraction of equity per trade (default 1.0=100%%, try 0.1 for 10%%)")
     p.add_argument("--model-dir", type=Path, default=None,
                    help="Path to models/artifacts — uses pre-trained model, skips retraining")
     args = p.parse_args()
@@ -211,5 +214,6 @@ if __name__ == "__main__":
         epochs=args.epochs,
         init_cash=args.balance,
         model_dir=args.model_dir,
+        size=args.size,
     )
     print(json.dumps({"symbol": args.symbol, **report}, indent=2))
