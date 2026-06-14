@@ -163,6 +163,7 @@ class Orchestrator:
             metrics.incr("gate_blocked")
             return
         self.signal_gate.record_consultation(symbol)
+
         consensus_str = ""
         if helios_agreed is True:
             consensus_str = " | ✅ Helios agrees"
@@ -170,6 +171,7 @@ class Orchestrator:
             consensus_str = " | ⚠️ Helios disagrees"
         elif helios_agreed is None and self.s.helios_enabled:
             consensus_str = " | ❓ Helios unavailable"
+
         await send_alert(
             f"📡 Signal | {symbol} | {signal.direction.value} | conf={signal.confidence:.2f}{consensus_str}"
         )

@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     venus_confidence_threshold: float = 0.65
     signal_cooldown_seconds: int = 900    # per-symbol cooldown between consultations
     max_agent_calls_per_hour: int = 12
+    helios_enabled: bool = True
+    helios_artifacts_dir: str = "models/artifacts_helios"
+    helios_confidence_threshold: float = 0.55
+
     high_confidence_threshold: float = 0.75   # bypass agents, scale up lots
     helios_enabled: bool = True
     helios_artifacts_dir: str = "models/artifacts_helios"
