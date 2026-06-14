@@ -14,6 +14,7 @@ from pathlib import Path
 
 import structlog
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
@@ -190,23 +191,39 @@ async def news():
 @app.get("/positions")
 async def positions():
     """Currently open positions straight from MT5 (live floating P&L)."""
-    pos = await get_mt5_client().get_positions()
-    return [p.model_dump(mode="json") for p in pos]
+    try:
+        pos = await get_mt5_client().get_positions()
+        return [p.model_dump(mode="json") for p in pos]
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "MT5 unavailable", "detail": str(e), "positions": []},
+        )
 
 
 @app.get("/risk/status")
 async def risk_status():
+    mt5_error: str | None = None
+    equity = 0.0
+    open_positions = 0
+    try:
+        account = await get_mt5_client().get_account()
+        equity = account.equity
+        open_positions = account.open_positions
+    except Exception as e:
+        mt5_error = str(e)
+
     async with get_sessionmaker()() as session:
         store = RiskStateStore(session)
-        account = await get_mt5_client().get_account()
         return {
-            "equity": account.equity,
-            "daily_pnl_pct": await store.daily_pnl_pct(account.equity),
+            "equity": equity,
+            "daily_pnl_pct": await store.daily_pnl_pct(equity),
             "trades_today": await store.trades_today(),
             "kill_switch_tripped": await store.is_tripped(),
             "shadow_mode": get_settings().shadow_mode,
-            "open_positions": account.open_positions,
+            "open_positions": open_positions,
             "market": market_status(),
+            "mt5_error": mt5_error,
         }
 
 
