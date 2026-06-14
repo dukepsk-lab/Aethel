@@ -94,14 +94,14 @@ def run_backtest(
                 loss = loss_fn(model({tf: x[tf][idx] for tf in SEQ}), y[idx])
                 loss.backward()
                 opt.step()
-                epoch_loss += float(loss)
+                epoch_loss += float(loss.detach())
                 n_batches += 1
             avg_loss = epoch_loss / max(n_batches, 1)
             print(f"  epoch {ep:>2}/{epochs}  loss={avg_loss:.4f}", flush=True)
         model.eval()
         with torch.no_grad():
             raw = torch.sigmoid(model({tf: x[tf][te] for tf in SEQ})).cpu().numpy()
-        y_te = y[te].numpy()
+        y_te = y[te].cpu().numpy()
         try:
             from sklearn.metrics import roc_auc_score
 
