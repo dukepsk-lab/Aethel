@@ -36,6 +36,7 @@ def build_helios_dataset(m5: pd.DataFrame):
     labels = selective_labels(
         frames["M15"],
         h1_features=feats["H1"],
+        h1_raw=frames["H1"],
         tp_mult=2.0, sl_mult=1.0, max_holding=48,
     )
 

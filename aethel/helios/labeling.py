@@ -15,7 +15,8 @@ from aethel.venus.labeling import triple_barrier_labels, ewm_volatility
 
 def selective_labels(
     m15: pd.DataFrame,
-    h1_features: pd.DataFrame,    # must contain 'dist_ema50', 'atr'
+    h1_features: pd.DataFrame,    # must contain 'dist_ema50'; raw H1 OHLC used for ATR
+    h1_raw: pd.DataFrame | None = None,  # H1 OHLC for ATR computation
     tp_mult: float = 2.0,
     sl_mult: float = 1.0,
     max_holding: int = 48,
@@ -27,7 +28,20 @@ def selective_labels(
 
     # resample h1 features to m15 index
     dist_ema50 = h1_features["dist_ema50"].reindex(m15.index, method="ffill")
-    h1_atr = h1_features["atr"].reindex(m15.index, method="ffill")
+
+    # compute raw ATR from H1 OHLC if available, else use atr_norm * close as proxy
+    if h1_raw is not None:
+        h1_c = h1_raw["close"]
+        tr = pd.concat([
+            h1_raw["high"] - h1_raw["low"],
+            (h1_raw["high"] - h1_c.shift(1)).abs(),
+            (h1_raw["low"] - h1_c.shift(1)).abs(),
+        ], axis=1).max(axis=1)
+        _h1_atr = tr.ewm(span=14).mean()
+    else:
+        # fallback: back-compute ATR from atr_norm * close
+        _h1_atr = h1_features["atr_norm"] * h1_raw["close"] if "atr_norm" in h1_features.columns else vol
+    h1_atr = _h1_atr.reindex(m15.index, method="ffill")
 
     direction = np.sign(dist_ema50).fillna(0).astype(int)
 
