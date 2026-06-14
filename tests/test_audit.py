@@ -45,3 +45,33 @@ def test_sharpe_computed_when_enough_days():
     p, closed = _series([100, -50, 200, -100, 150, 80, -30, 120])
     out = _pnl_metrics(p, closed, equity_base=10_000)
     assert out["sharpe"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Drift integration helpers (unit tests for the pure logic only — the async
+# DB join is tested via the live DB, not here)
+# ---------------------------------------------------------------------------
+
+def test_drift_in_audit_format():
+    """DriftReport.to_dict() produces the schema gather_weekly_stats embeds."""
+    from aethel.venus.drift import run_drift_check
+    import numpy as np
+
+    probs = np.full(30, 0.8)
+    outcomes = np.array([1] * 15 + [0] * 15)
+    report = run_drift_check("EURUSD", probs, outcomes)
+    d = report.to_dict()
+    assert d["symbol"] == "EURUSD"
+    assert "calibration_drift" in d
+    assert "has_alert" in d
+    assert d["calibration_alert"] is True   # 0.80 predicted vs 0.50 actual → alert
+
+
+def test_drift_no_alert_when_calibrated():
+    from aethel.venus.drift import run_drift_check
+    import numpy as np
+
+    probs = np.full(30, 0.55)
+    outcomes = np.array([1] * 17 + [0] * 13)   # hit rate ≈ 0.567 ≈ conf
+    report = run_drift_check("USDJPY", probs, outcomes)
+    assert not report.calibration_alert

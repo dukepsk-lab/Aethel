@@ -44,6 +44,7 @@ from aethel.observability.signal_log import signal_log
 from aethel.risk_gate.gate import RiskGate
 from aethel.signal_gate import SignalGate
 from aethel.venus.inference import VenusInference
+from aethel.venus.retrain import run_retrain_cycle
 
 log = structlog.get_logger("orchestrator")
 
@@ -97,6 +98,7 @@ class Orchestrator:
         log.info("aethel_started", shadow_mode=self.s.shadow_mode, symbols=SYMBOLS)
         await send_alert(f"✅ Aethel started — {'SHADOW' if self.s.shadow_mode else 'LIVE'} mode | symbols: {', '.join(SYMBOLS)}")
         asyncio.create_task(self._weekly_audit_loop())
+        asyncio.create_task(self._scheduled_retrain_loop())
         try:
             while True:
                 is_open = _market_is_open()
@@ -372,6 +374,61 @@ class Orchestrator:
             except Exception as e:
                 log.error("themis_audit_failed", error=str(e))
                 metrics.incr("themis_failures")
+
+    async def _scheduled_retrain_loop(self) -> None:
+        """Benchmark + promote Venus every ``retrain_interval_days`` days.
+
+        Runs in the background, fail-soft — a failed retrain is logged and
+        retried on the next interval. On promotion the in-process
+        VenusInference is hot-reloaded so the bot picks up the new weights
+        without a restart.
+        """
+        interval = timedelta(days=self.s.retrain_interval_days)
+        await asyncio.sleep(interval.total_seconds())   # first run after one interval
+        while True:
+            promoted: list[str] = []
+            skipped: list[str] = []
+            errors:  list[str] = []
+            data_dir = Path(self.s.retrain_data_dir)
+            artifacts_dir = Path(self.s.retrain_artifacts_dir)
+            for symbol in list(self.venus):
+                data_path = data_dir / f"{symbol}_m5.parquet"
+                if not data_path.exists():
+                    log.warning("retrain_data_missing", symbol=symbol, path=str(data_path))
+                    errors.append(symbol)
+                    continue
+                try:
+                    result = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda sym=symbol, dp=data_path: run_retrain_cycle(sym, dp, artifacts_dir / sym),
+                    )
+                    if result["action"] == "promoted":
+                        # hot-reload — replace the in-process VenusInference
+                        try:
+                            self.venus[symbol] = VenusInference(artifacts_dir, symbol)
+                            log.info("venus_hot_reloaded", symbol=symbol)
+                        except Exception as e:
+                            log.error("venus_hot_reload_failed", symbol=symbol, error=str(e))
+                        promoted.append(symbol)
+                    else:
+                        skipped.append(symbol)
+                    metrics.incr("retrain_cycles")
+                except Exception as e:
+                    log.error("retrain_failed", symbol=symbol, error=str(e))
+                    errors.append(symbol)
+                    metrics.incr("retrain_errors")
+
+            parts = []
+            if promoted:
+                parts.append(f"✅ promoted: {', '.join(promoted)}")
+            if skipped:
+                parts.append(f"↷ no improvement: {', '.join(skipped)}")
+            if errors:
+                parts.append(f"⚠️ errors: {', '.join(errors)}")
+            msg = f"🔄 Retrain cycle complete | {' | '.join(parts)}"
+            await send_alert(msg)
+            log.info("retrain_cycle_complete", promoted=promoted, skipped=skipped, errors=errors)
+            await asyncio.sleep(interval.total_seconds())
 
     async def post_trade_analysis(self, decision_id: str, trade_context: dict) -> None:
         """Runs async after a trade closes — never blocks the signal loop."""

@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     daily_reset_hour_utc: int = 21        # ~5pm New York (broker rollover)
     news_blackout_minutes: int = 30       # no entries within this window of high-impact events
 
+    # Automated retrain (Track A)
+    retrain_interval_days: int = 30       # how often to benchmark + promote
+    retrain_data_dir: str = "data"        # directory containing <SYMBOL>_m5.parquet files
+    retrain_artifacts_dir: str = "models/artifacts"   # champion artifact root
+    min_drift_samples: int = 20           # min closed trades before drift check runs
+
     # Trade management (rule-based, pure Python)
     breakeven_trigger_rr: float = 1.0     # move SL to BE at 1R profit
     trailing_start_rr: float = 1.5

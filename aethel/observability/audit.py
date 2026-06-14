@@ -12,12 +12,15 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import numpy as np
 import pandas as pd
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aethel.config import get_settings
 from aethel.core.schemas import utcnow
 from aethel.db.models import ClosedTrade, Decision, TradeMemory
+from aethel.venus.drift import run_drift_check
 from aethel.observability.metrics import metrics
 
 
@@ -78,6 +81,36 @@ async def gather_weekly_stats(session: AsyncSession, equity: float) -> dict:
     avg_ares_q = round(float(quality_row[0]), 2) if quality_row and quality_row[0] else None
     avg_athena_q = round(float(quality_row[1]), 2) if quality_row and quality_row[1] else None
 
+    # --- calibration drift: join ClosedTrade ↔ Decision on decision_id ---
+    s = get_settings()
+    drift_reports: dict[str, dict] = {}
+    if len(trades) >= s.min_drift_samples:
+        ticket_to_trade = {t.ticket: t for t in trades}
+        decision_rows = (await session.execute(
+            select(Decision.ticket, Decision.symbol, Decision.venus_signal)
+            .where(
+                Decision.ticket.in_(list(ticket_to_trade.keys())),
+                Decision.venus_signal.isnot(None),
+            )
+        )).all()
+        # group by symbol
+        sym_preds: dict[str, list[float]] = {}
+        sym_outcomes: dict[str, list[int]] = {}
+        for ticket, symbol, venus_signal in decision_rows:
+            conf = venus_signal.get("confidence") if isinstance(venus_signal, dict) else None
+            if conf is None:
+                continue
+            trade = ticket_to_trade.get(ticket)
+            if trade is None:
+                continue
+            sym_preds.setdefault(symbol, []).append(float(conf))
+            sym_outcomes.setdefault(symbol, []).append(int(trade.profit > 0))
+        for sym, preds in sym_preds.items():
+            outcomes = sym_outcomes[sym]
+            if len(preds) >= s.min_drift_samples:
+                report = run_drift_check(sym, np.array(preds), np.array(outcomes))
+                drift_reports[sym] = report.to_dict()
+
     counters = dict(metrics.counters)
     return {
         "window_days": 7,
@@ -90,6 +123,7 @@ async def gather_weekly_stats(session: AsyncSession, equity: float) -> dict:
         "lessons_recorded": lesson_quality,
         "avg_ares_quality": avg_ares_q,
         "avg_athena_quality": avg_athena_q,
+        "drift_reports": drift_reports,       # calibration drift per symbol
         "gate_blocked": counters.get("gate_blocked", 0),
         "risk_rejections": {k.removeprefix("risk_reject_"): v
                             for k, v in counters.items()
