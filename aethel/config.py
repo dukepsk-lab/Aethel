@@ -96,6 +96,7 @@ class Settings(BaseSettings):
     retrain_interval_days: int = 30       # how often to benchmark + promote
     retrain_data_dir: str = "data"        # directory containing <SYMBOL>_m5.parquet files
     retrain_artifacts_dir: str = "models/artifacts"   # champion artifact root
+    retrain_data_days: int = 730          # rolling training window (2yr) — current regime
     min_drift_samples: int = 20           # min closed trades before drift check runs
 
     # Trade management (rule-based, pure Python)

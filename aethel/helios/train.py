@@ -64,7 +64,8 @@ def build_helios_dataset(m5: pd.DataFrame):
     return x, y, t_end, meta
 
 
-def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20) -> None:
+def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
+          data_days: int | None = None) -> None:
     import torch
     from aethel.venus.model import VenusNet
 
@@ -72,6 +73,11 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20) -> None
     print(f"[Helios] training {symbol} on {device}")
 
     m5 = pd.read_parquet(data_path)
+    if data_days is not None:
+        cutoff = m5.index[-1] - pd.Timedelta(days=data_days)
+        before = len(m5)
+        m5 = m5[m5.index >= cutoff]
+        print(f"[Helios] {symbol}: sliced to last {data_days}d — {before} -> {len(m5)} M5 bars")
     x, y, t_end, _meta = build_helios_dataset(m5)
     y = y.to(device)
     n = len(y)
@@ -156,5 +162,8 @@ if __name__ == "__main__":
     p.add_argument("--data", required=True, type=Path)
     p.add_argument("--out", type=Path, default=Path("models/artifacts_helios"))
     p.add_argument("--epochs", type=int, default=20)
+    p.add_argument("--data-days", type=int, default=None,
+                   help="Train on only the last N calendar days (e.g. 730 = 2 years)")
     args = p.parse_args()
-    train(args.symbol, Path(args.data), args.out, args.epochs)
+    train(args.symbol, Path(args.data), args.out, args.epochs,
+          data_days=args.data_days)

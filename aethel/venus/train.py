@@ -119,7 +119,8 @@ def build_dataset(m5: pd.DataFrame):
 
 
 def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
-          batch_size: int = 256, lr: float = 1e-3) -> None:
+          batch_size: int = 256, lr: float = 1e-3,
+          data_days: int | None = None) -> None:
     import torch
 
     from aethel.venus.model import VenusNet
@@ -128,6 +129,11 @@ def train(symbol: str, data_path: Path, out_dir: Path, epochs: int = 20,
     print(f"training on device: {device}")
 
     m5 = pd.read_parquet(data_path)
+    if data_days is not None:
+        cutoff = m5.index[-1] - pd.Timedelta(days=data_days)
+        before = len(m5)
+        m5 = m5[m5.index >= cutoff]
+        print(f"{symbol}: sliced to last {data_days}d — {before} -> {len(m5)} M5 bars")
     x, y, t_end, _meta = build_dataset(m5)
     # keep features on CPU (can be large); move per-batch. labels are small.
     y = y.to(device)
@@ -211,5 +217,8 @@ if __name__ == "__main__":
     p.add_argument("--data", required=True, type=Path)
     p.add_argument("--out", type=Path, default=Path("models/artifacts"))
     p.add_argument("--epochs", type=int, default=20)
+    p.add_argument("--data-days", type=int, default=None,
+                   help="Train on only the last N calendar days (e.g. 730 = 2 years)")
     args = p.parse_args()
-    train(args.symbol, args.data, args.out, epochs=args.epochs)
+    train(args.symbol, args.data, args.out, epochs=args.epochs,
+          data_days=args.data_days)

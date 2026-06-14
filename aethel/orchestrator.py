@@ -400,7 +400,9 @@ class Orchestrator:
                 try:
                     result = await asyncio.get_event_loop().run_in_executor(
                         None,
-                        lambda sym=symbol, dp=data_path: run_retrain_cycle(sym, dp, artifacts_dir / sym),
+                        lambda sym=symbol, dp=data_path: run_retrain_cycle(
+                            sym, dp, artifacts_dir / sym,
+                            data_days=self.s.retrain_data_days),
                     )
                     if result["action"] == "promoted":
                         # hot-reload — replace the in-process VenusInference

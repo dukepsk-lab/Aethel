@@ -82,7 +82,8 @@ def _try_mlflow_log(symbol: str, bench: dict, action: str) -> None:
 
 
 def run_retrain_cycle(symbol: str, data_path: Path,
-                      out_dir: Path | None = None, force: bool = False) -> dict:
+                      out_dir: Path | None = None, force: bool = False,
+                      data_days: int | None = None) -> dict:
     """Full retrain cycle for one symbol.
 
     1. Benchmark champion vs challengers on the latest data (purged WF folds).
@@ -91,12 +92,21 @@ def run_retrain_cycle(symbol: str, data_path: Path,
     3. Record metrics + action in the registry, and log to MLflow if present.
 
     ``data_path`` is the latest M5 parquet; ``out_dir`` defaults to
-    ``models/artifacts/{symbol}``. Returns ``{symbol, action, benchmark}``
-    where action is one of ``promoted`` / ``skipped``.
+    ``models/artifacts/{symbol}``. ``data_days`` (e.g. 730) restricts both the
+    benchmark and the champion training to the most recent N calendar days — a
+    rolling window keeps the model on the current regime instead of averaging
+    over stale years. Returns ``{symbol, action, benchmark}`` where action is
+    one of ``promoted`` / ``skipped``.
     """
     out_dir = out_dir or (ARTIFACTS / symbol)
     logger.info("[retrain] starting cycle for %s", symbol)
     m5_df = pd.read_parquet(data_path)
+    if data_days is not None:
+        cutoff = m5_df.index[-1] - pd.Timedelta(days=data_days)
+        before = len(m5_df)
+        m5_df = m5_df[m5_df.index >= cutoff]
+        logger.info("[retrain] %s sliced to last %dd — %d -> %d bars",
+                    symbol, data_days, before, len(m5_df))
     bench = benchmark(m5_df, epochs=8, n_splits=4, threshold=0.65)
     tcn_auc = bench.get("TCN (champion)", {}).get("mean_auc")
     logger.info("[retrain] benchmark done for %s — TCN mean_auc=%s", symbol, tcn_auc)
@@ -105,7 +115,7 @@ def run_retrain_cycle(symbol: str, data_path: Path,
     action = "skipped"
     if promoted:
         logger.info("[retrain] promotion bar met — training champion for %s", symbol)
-        train(symbol, data_path, out_dir)
+        train(symbol, data_path, out_dir, data_days=data_days)
         action = "promoted"
         logger.info("[retrain] %s champion updated", symbol)
     else:
@@ -143,6 +153,8 @@ if __name__ == "__main__":
                     help="Promote even if promotion bar is not met (use for first run)")
     ap.add_argument("--epochs", type=int, default=20,
                     help="Training epochs for the full champion model (default: 20)")
+    ap.add_argument("--data-days", type=int, default=None,
+                    help="Rolling window: use only the last N days (e.g. 730 = 2 years)")
     ap.add_argument("--deploy", metavar="USER@HOST",
                     help="rsync artifacts to VPS after training, e.g. ubuntu@1.2.3.4")
     ap.add_argument("--deploy-path", default="~/aethel/models/artifacts",
@@ -152,7 +164,8 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     result = run_retrain_cycle(args.symbol, args.data,
-                               out_dir=args.out_dir, force=args.force)
+                               out_dir=args.out_dir, force=args.force,
+                               data_days=args.data_days)
     print(json.dumps(result, indent=2, default=str))
 
     if args.deploy and result["action"] == "promoted":
