@@ -68,20 +68,22 @@ class Settings(BaseSettings):
     max_deviation_pips: float = 2.0       # price-drift tolerance at execution
 
     # Signal gate — keeps agent call volume and noise bounded
-    venus_confidence_threshold: float = 0.65
+    venus_confidence_threshold: float = 0.45  # lowered to match backtest default
     signal_cooldown_seconds: int = 900    # per-symbol cooldown between consultations
     max_agent_calls_per_hour: int = 12
     helios_enabled: bool = True
     helios_artifacts_dir: str = "models/artifacts_helios"
-    helios_confidence_threshold: float = 0.55
+    helios_confidence_threshold: float = 0.50  # lowered to match backtest default
 
     high_confidence_threshold: float = 0.75   # bypass agents, scale up lots
     helios_enabled: bool = True
     helios_artifacts_dir: str = "models/artifacts_helios"
-    helios_confidence_threshold: float = 0.55
-    high_confidence_lot_multiplier: float = 1.5  # multiply base risk_pct by this
-    max_risk_pct_high_conf: float = 1.5       # hard cap on risk_pct for high-conf trades
-    base_risk_pct: float = 0.5               # default risk_pct used in high-conf fast path
+    helios_confidence_threshold: float = 0.50
+    high_confidence_lot_multiplier: float = 1.5
+    max_risk_pct_high_conf: float = 1.5
+    base_risk_pct: float = 0.5
+
+    bypass_agents: bool = False  # True = skip Ares/Athena, trade on model signal alone
 
     # Risk gate (hard limits — AI cannot override)
     max_daily_loss_pct: float = 3.0

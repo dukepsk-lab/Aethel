@@ -7,7 +7,7 @@ export function SignalFeed({ signals }: { signals: any[] | undefined }) {
   return (
     <div className={styles.feed}>
       <div className={styles.header}>
-        <span>Venus Signals</span>
+        <span>Venus · Helios Signals</span>
         <span className={styles.count}>{signals?.length ?? 0} evaluations</span>
       </div>
 
@@ -25,7 +25,25 @@ export function SignalFeed({ signals }: { signals: any[] | undefined }) {
               <span className={clsx(styles.dir, s.direction === "BUY" ? styles.buy : styles.sell)}>
                 {s.direction === "BUY" ? "▲" : "▼"}
               </span>
+
+              {/* Venus confidence */}
+              <span className={styles.modelLabel}>V</span>
               <span className={styles.conf}>{(s.confidence * 100).toFixed(1)}%</span>
+
+              {/* Helios confidence (if available) */}
+              {s.helios_confidence != null && (
+                <>
+                  <span className={styles.modelLabel} style={{ color: "var(--purple, #bc8cff)" }}>H</span>
+                  <span className={clsx(styles.conf, s.helios_agreed ? styles.heliosOn : styles.heliosOff)}>
+                    {(s.helios_confidence * 100).toFixed(1)}%
+                    {s.helios_agreed ? " ✓" : " ✗"}
+                  </span>
+                </>
+              )}
+              {s.helios_confidence == null && (
+                <span className={styles.heliosMissing}>H —</span>
+              )}
+
               <span className={clsx(styles.badge, s.passed_gate ? styles.pass : styles.block)}>
                 {s.passed_gate ? "PASSED" : "BLOCKED"}
               </span>

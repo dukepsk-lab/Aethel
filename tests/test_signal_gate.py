@@ -9,7 +9,7 @@ def make_signal(confidence: float, symbol: str = "EURUSD") -> VenusSignal:
 
 def test_low_confidence_blocked():
     gate = SignalGate()
-    ok, reason = gate.should_consult_agents(make_signal(0.5))
+    ok, reason = gate.should_consult_agents(make_signal(0.3))  # below 0.45 threshold
     assert not ok and "threshold" in reason
 
 

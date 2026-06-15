@@ -46,6 +46,16 @@
 
 .reason { font-size: 10px; color: var(--muted); margin-top: 3px; padding-left: 2px; }
 
+.modelLabel {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.heliosOn  { color: #bc8cff; font-weight: 700; }
+.heliosOff { color: var(--muted); font-weight: 400; }
+.heliosMissing { font-size: 10px; color: var(--muted); opacity: 0.5; }
+
 @media (max-width: 768px) {
   .feed { height: auto; max-height: 60vh; }
 }

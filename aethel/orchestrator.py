@@ -159,7 +159,9 @@ class Orchestrator:
 
         # 2. Signal Gate
         consult, reason = self.signal_gate.should_consult_agents(signal)
-        signal_log.record(signal, passed=consult, reason=reason)
+        signal_log.record(signal, passed=consult, reason=reason,
+                          helios_confidence=helios_conf,
+                          helios_agreed=helios_agreed)
         if not consult:
             log.debug("gate_blocked", symbol=symbol, reason=reason)
             metrics.incr("gate_blocked")
@@ -261,6 +263,51 @@ class Orchestrator:
                     )
                     session.add(record)
 
+            if tier == "normal" and self.s.bypass_agents:
+                # bypass_agents mode: skip Ares/Athena, use ATR-based SL/TP directly
+                log.info("bypass_agents_path", symbol=symbol, confidence=signal.confidence)
+                metrics.incr("bypass_agents_trades")
+                try:
+                    tick = await self.mt5.get_tick(symbol)
+                    entry = tick.ask if signal.direction == Action.BUY else tick.bid
+                    h1_candles = candles[Timeframe.H1]
+                    highs = [c.high for c in h1_candles[-20:]]
+                    lows = [c.low for c in h1_candles[-20:]]
+                    atr = float(np.mean([h - l for h, l in zip(highs, lows)]))
+                    if signal.direction == Action.BUY:
+                        stop_loss = entry - 1.0 * atr
+                        take_profit = entry + 2.0 * atr
+                    else:
+                        stop_loss = entry + 1.0 * atr
+                        take_profit = entry - 2.0 * atr
+                    proposal = AresProposal(
+                        symbol=symbol, action=signal.direction,
+                        entry=round(entry, 5),
+                        stop_loss=round(stop_loss, 5),
+                        take_profit=round(take_profit, 5),
+                        risk_pct=self.s.base_risk_pct,
+                        rationale=f"bypass_agents (conf={signal.confidence:.2f})",
+                    )
+                    decision = AthenaDecision(
+                        verdict=Verdict.APPROVE,
+                        proposal=proposal,
+                        athena_rationale="bypass_agents — Ares/Athena skipped by config",
+                        venus_confidence=signal.confidence,
+                        expires_at=utcnow() + timedelta(seconds=self.s.decision_ttl_seconds),
+                    )
+                    record = Decision(
+                        decision_id=decision.decision_id, symbol=symbol,
+                        state=TradeState.APPROVED, venus_signal=signal.model_dump(mode="json"),
+                        ares_proposal=proposal.model_dump(mode="json"),
+                        athena_decision={"verdict": "BYPASS", "veto_reason": None},
+                        created_at=utcnow(), updated_at=utcnow(),
+                    )
+                    session.add(record)
+                    tier = "bypass_done"
+                except Exception as e:
+                    log.warning("bypass_agents_failed", symbol=symbol, error=str(e))
+                    return
+
             if tier == "normal":
                 # 3. Ares proposes
                 try:
@@ -309,7 +356,7 @@ class Orchestrator:
                 metrics.incr("athena_approve")
                 record.state = TradeState.APPROVED
 
-            # 5. Risk Gate — fresh tick, hard limits
+            # 5. Risk Gate — fresh tick, hard limits (runs for all tiers)
             with metrics.time_stage("risk_gate"):
                 tick = await self.mt5.get_tick(symbol)
                 outcome = await self.risk_gate.validate(
