@@ -101,6 +101,7 @@ class Orchestrator:
         await send_alert(f"✅ Aethel started — {'SHADOW' if self.s.shadow_mode else 'LIVE'} mode | symbols: {', '.join(SYMBOLS)}")
         asyncio.create_task(self._weekly_audit_loop())
         asyncio.create_task(self._scheduled_retrain_loop())
+        asyncio.create_task(self._detect_closed_trades_loop())
         try:
             while True:
                 is_open = _market_is_open()
@@ -520,6 +521,85 @@ class Orchestrator:
                 metrics.incr("orders_failed")
                 await send_alert(f"⚠️ Helios order failed {symbol}: {result.detail}")
             await session.commit()
+
+    async def _detect_closed_trades_loop(self) -> None:
+        """Poll MT5 deal history every 60s and persist newly-closed trades.
+
+        Trades closed by SL/TP/broker are never seen by the Hermes executor,
+        so without this loop they vanish from the DB. We match on ticket
+        (position_id) against EXECUTED decisions to link the decision_id.
+        """
+        from aethel.db.models import ClosedTrade
+        from datetime import timedelta as _td
+
+        # look back 24h on first run to catch trades closed while bot was down
+        look_back = utcnow() - _td(hours=24)
+
+        while True:
+            await asyncio.sleep(60)
+            try:
+                deals = await self.mt5.get_closed_deals(look_back)
+                if not deals:
+                    look_back = utcnow() - _td(minutes=10)
+                    continue
+
+                async with get_sessionmaker()() as session:
+                    # load known tickets to avoid re-inserting
+                    existing = set(
+                        r[0] for r in (await session.execute(
+                            select(ClosedTrade.ticket)
+                        )).all()
+                    )
+                    # map ticket → decision_id from EXECUTED decisions
+                    from aethel.db.models import Decision as _Dec
+                    dec_rows = (await session.execute(
+                        select(_Dec.ticket, _Dec.decision_id, _Dec.venus_signal)
+                        .where(_Dec.state.in_(["EXECUTED", "MANAGED"]),
+                               _Dec.ticket.isnot(None))
+                    )).all()
+                    ticket_to_dec = {r.ticket: (r.decision_id, r.venus_signal)
+                                     for r in dec_rows}
+
+                    new_trades = []
+                    for d in deals:
+                        t = d["ticket"]
+                        if t in existing:
+                            continue
+                        dec_id, vsig = ticket_to_dec.get(t, (f"unknown-{t}", {}))
+                        action = "BUY" if (d.get("type") == 1) else "SELL"
+                        ct = ClosedTrade(
+                            ticket=t,
+                            decision_id=dec_id,
+                            symbol=d["symbol"],
+                            action=action,
+                            lots=d.get("volume", 0.0),
+                            entry=d.get("price_in") or 0.0,
+                            exit_price=d.get("price_out") or 0.0,
+                            profit=d.get("profit", 0.0),
+                            opened_at=d.get("time_open") or utcnow(),
+                            closed_at=d.get("time_close") or utcnow(),
+                        )
+                        session.add(ct)
+                        new_trades.append(ct)
+
+                    if new_trades:
+                        await session.commit()
+                        for ct in new_trades:
+                            pnl = ct.profit
+                            log.info("closed_trade_recorded", symbol=ct.symbol,
+                                     ticket=ct.ticket, profit=pnl)
+                            metrics.incr("closed_trades_detected")
+                        await send_alert(
+                            f"📋 {len(new_trades)} trade(s) closed | "
+                            + " | ".join(
+                                f"{t.symbol} {t.action} {t.profit:+.2f}" for t in new_trades
+                            )
+                        )
+
+                look_back = utcnow() - _td(minutes=10)
+
+            except Exception as e:
+                log.error("detect_closed_trades_failed", error=str(e))
 
     async def _weekly_audit_loop(self) -> None:
         """Themis runs once a week at the Sunday rollover. Fail-soft: an

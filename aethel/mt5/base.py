@@ -12,6 +12,7 @@ interface with two implementations:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from aethel.core.schemas import (
     AccountState,
@@ -36,6 +37,9 @@ class MT5Client(ABC):
 
     @abstractmethod
     async def get_positions(self) -> list[Position]: ...
+
+    @abstractmethod
+    async def get_closed_deals(self, since: datetime) -> list[dict]: ...
 
     @abstractmethod
     async def place_limit_order(self, order: ValidatedOrder) -> ExecutionResult:

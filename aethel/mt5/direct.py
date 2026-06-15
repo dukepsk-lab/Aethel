@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from aethel.core.schemas import (
     AccountState,
@@ -84,6 +85,42 @@ class DirectMT5Client(MT5Client):
             )
             for p in raw
         ]
+
+    async def get_closed_deals(self, since: datetime) -> list[dict]:
+        """Return closing deals (DEAL_ENTRY_OUT) from MT5 history since `since`."""
+        mt5 = self._mt5
+        now = datetime.now(timezone.utc)
+        deals = await self._run(mt5.history_deals_get, since, now) or []
+        out = []
+        for d in deals:
+            # DEAL_ENTRY_OUT = 1 (closing deal); skip everything else
+            if getattr(d, "entry", None) != 1:
+                continue
+            out.append({
+                "ticket":     d.position_id,   # position ticket (matches order ticket)
+                "deal_id":    d.ticket,
+                "symbol":     d.symbol,
+                "type":       d.type,           # 0=buy, 1=sell
+                "volume":     d.volume,
+                "price_in":   None,             # filled from history_orders below
+                "price_out":  d.price,
+                "profit":     d.profit,
+                "time_open":  None,
+                "time_close": datetime.fromtimestamp(d.time, tz=timezone.utc),
+            })
+        # enrich with open price from history orders
+        if out:
+            ticket_set = {r["ticket"] for r in out}
+            orders = await self._run(mt5.history_orders_get, since, now) or []
+            order_map: dict[int, Any] = {
+                o.position_id: o for o in orders if o.position_id in ticket_set
+            }
+            for r in out:
+                o = order_map.get(r["ticket"])
+                if o:
+                    r["price_in"] = o.price_open
+                    r["time_open"] = datetime.fromtimestamp(o.time_setup, tz=timezone.utc)
+        return out
 
     async def place_limit_order(self, order: ValidatedOrder) -> ExecutionResult:
         mt5 = self._mt5

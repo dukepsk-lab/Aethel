@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import httpx
-
-from aethel.core.schemas import (
+from datetime import datetime
     AccountState,
     Candle,
     ExecutionResult,
@@ -57,3 +56,6 @@ class GatewayMT5Client(MT5Client):
     async def close_position(self, ticket: int) -> bool:
         data = await self._post("/positions/close", {"ticket": ticket})
         return bool(data.get("ok"))
+
+    async def get_closed_deals(self, since: datetime) -> list[dict]:
+        return await self._get("/deals/closed", since=since.isoformat())
