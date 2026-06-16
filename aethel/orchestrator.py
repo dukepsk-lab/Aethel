@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import structlog
+from sqlalchemy import select
 
 from aethel.agents.apollo import Apollo
 from aethel.agents.ares import Ares
